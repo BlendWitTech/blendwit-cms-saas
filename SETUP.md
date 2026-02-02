@@ -1,0 +1,80 @@
+# Setup Guide
+
+Follow these steps to set up and run the Blendwit CMS project locally.
+
+## Prerequisites
+
+Ensure you have the following installed on your machine:
+
+- **Node.js**: v20 or higher
+- **npm**: v10 or higher
+- **Docker & Docker Compose**: For running the PostgreSQL database
+
+## Installation Steps
+
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd cms
+```
+
+### 2. Install Dependencies
+Install all dependencies for the root, backend, and frontend:
+```bash
+npm run install:all
+```
+
+### 3. Environment Configuration
+The backend requires a `.env` file for database connection and secrets. Templates have been provided as `.env.example` in both the root and child directories.
+
+For a quick start, copy the backend example:
+```bash
+cp backend/.env.example backend/.env
+```
+
+**`backend/.env`**:
+```env
+DATABASE_URL="postgresql://admin:password123@localhost:5432/blendwit_cms?schema=public"
+JWT_SECRET="supersercretkey123"
+PORT=3001
+```
+
+### 4. Start Infrastructure
+Run the database and pgAdmin using Docker Compose:
+```bash
+docker-compose up -d
+```
+> [!NOTE]
+> This will start PostgreSQL on port `5432` and pgAdmin on port `5050`. The backend is configured to run on port `3001` by default to avoid conflicts with the frontend.
+
+### 5. Initialize Database
+Run Prisma migrations and seed the database with initial data (Super Admin, Roles, and CMS settings):
+```bash
+cd backend
+npx prisma migrate dev --name init
+npx prisma db seed
+cd ..
+```
+
+## Running the Application
+
+You can start both the frontend and backend development servers from the root directory:
+
+```bash
+npm run dev
+```
+
+### Accessing the System
+
+- **Frontend (Next.js)**: [http://localhost:3000/login](http://localhost:3000/login)
+- **Backend API (NestJS)**: [http://localhost:3001](http://localhost:3001)
+- **Super Admin Credentials**:
+    - **Email**: `superadmin@blendwit.com`
+    - **Password**: `admin123`
+    - *Note: You will be prompted to change your password on first login.*
+
+## Troubleshooting
+
+- **Database Connection Error (P1001)**: Ensure Docker is running and the containers are started with `docker-compose up -d`.
+- **Backend Port Conflict**: If port `3001` is already in use, you can change the port in `backend/.env`.
+- **Fetch Settings Failed**: Ensure the backend is running on port `3001`, as the frontend expects it there.

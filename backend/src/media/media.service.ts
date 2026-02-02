@@ -1,0 +1,329 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
+import * as sharp from 'sharp';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as ffmpeg from 'fluent-ffmpeg';
+import * as process from 'process';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Handle ffmpeg paths defensively
+try {
+    const ffmpegInstaller = require('ffmpeg-static');
+    const ffprobeInstaller = require('ffprobe-static');
+    ffmpeg.setFfmpegPath(ffmpegInstaller);
+    ffmpeg.setFfprobePath(ffprobeInstaller.path);
+} catch (e) {
+    console.warn('FFmpeg static binaries not found, video processing might fail.', e);
+}
+
+@Injectable()
+export class MediaService {
+    private readonly logger = new Logger(MediaService.name);
+
+    constructor(
+        private prisma: PrismaService,
+        private settingsService: SettingsService
+    ) { }
+
+    private async configureCloudinary() {
+        const settings = await this.settingsService.findAll();
+        const cloudName = settings['cloudinary_cloud_name'];
+        const apiKey = settings['cloudinary_api_key'];
+        const apiSecret = settings['cloudinary_api_secret'];
+
+        if (cloudName && apiKey && apiSecret) {
+            cloudinary.config({
+                cloud_name: cloudName,
+                api_key: apiKey,
+                api_secret: apiSecret,
+            });
+            return true;
+        }
+        return false;
+    }
+
+    private async uploadToCloud(filePath: string, folder: string = 'cms_uploads', resourceType: 'image' | 'video' | 'raw' = 'image') {
+        try {
+            const result = await cloudinary.uploader.upload(filePath, {
+                folder,
+                resource_type: resourceType,
+            });
+            return result.secure_url;
+        } catch (error) {
+            this.logger.error(`Cloudinary upload failed for ${filePath}`, error);
+            throw error;
+        }
+    }
+
+    async create(file: Express.Multer.File) {
+        const isImage = file.mimetype.startsWith('image/');
+        const isVideo = file.mimetype.startsWith('video/');
+        const filename = path.parse(file.filename).name;
+        const uploadDir = './uploads';
+
+        // Ensure upload dir exists
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+
+        // Paths
+        let finalFilename = file.filename; // Default to local
+        let finalUrl = ""; // Will be determined (local or cloud)
+        let finalMimeType = file.mimetype;
+        let metadata: any = {};
+        let width: number | null = null;
+        let height: number | null = null;
+        let duration: number | null = null;
+
+        const useCloudinary = await this.configureCloudinary();
+
+        if (isImage) {
+            const webpFilename = `${filename}.webp`;
+            const webpPath = path.join(uploadDir, webpFilename);
+
+            const image = sharp(file.path);
+            const info = await image.metadata();
+            width = info.width || null;
+            height = info.height || null;
+
+            // Convert original to WebP
+            await image.ensureAlpha().webp({ quality: 80 }).toFile(webpPath);
+            finalFilename = webpFilename;
+            finalMimeType = 'image/webp';
+
+            // Generate versions
+            const versions = {
+                small: 400,
+                medium: 800,
+                large: 1200,
+            };
+
+            const versionPaths: any = {};
+
+            // Process versions locally first
+            for (const [key, size] of Object.entries(versions)) {
+                const vFilename = `${filename}-${key}.webp`;
+                const vPath = path.join(uploadDir, vFilename);
+                await sharp(file.path)
+                    .ensureAlpha()
+                    .resize(size, null, { withoutEnlargement: true })
+                    .webp({ quality: 80 })
+                    .toFile(vPath);
+
+                if (useCloudinary) {
+                    versionPaths[key] = await this.uploadToCloud(vPath);
+                    // Delete local version after upload
+                    try { fs.unlinkSync(vPath); } catch (e) { }
+                } else {
+                    versionPaths[key] = `/uploads/${vFilename}`;
+                }
+            }
+
+            metadata.versions = versionPaths;
+
+            if (useCloudinary) {
+                // Upload main image
+                finalUrl = await this.uploadToCloud(webpPath);
+                // Delete local webp
+                try { fs.unlinkSync(webpPath); } catch (e) { }
+            } else {
+                finalUrl = `/uploads/${finalFilename}`;
+            }
+
+            // Remove original uploaded file
+            try {
+                fs.unlinkSync(file.path);
+            } catch (err) {
+                console.error('Failed to delete original file:', err);
+            }
+        } else if (isVideo) {
+            // Video Processing
+            finalFilename = file.filename;
+
+            // Generate Thumbnail
+            const thumbnailFilename = `${filename}-poster.webp`;
+            const thumbnailPath = path.join(uploadDir, thumbnailFilename);
+
+            await new Promise((resolve, reject) => {
+                ffmpeg(file.path)
+                    .screenshots({
+                        count: 1,
+                        folder: uploadDir,
+                        filename: thumbnailFilename,
+                        size: '800x?'
+                    })
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+
+            // Get Metadata
+            await new Promise((resolve, reject) => {
+                ffmpeg.ffprobe(file.path, (err, data) => {
+                    if (err) return reject(err);
+                    const stream = data.streams.find(s => s.codec_type === 'video');
+                    if (stream) {
+                        width = stream.width || null;
+                        height = stream.height || null;
+                        duration = data.format.duration || null;
+                    }
+                    resolve(null);
+                });
+            });
+
+            if (useCloudinary) {
+                const videoUrl = await this.uploadToCloud(file.path, 'cms_uploads', 'video');
+                const posterUrl = await this.uploadToCloud(thumbnailPath);
+
+                finalUrl = videoUrl;
+                metadata = {
+                    poster: posterUrl,
+                    duration: duration,
+                    isCloudinary: true
+                };
+
+                // Cleanup
+                try { fs.unlinkSync(file.path); } catch (e) { }
+                try { fs.unlinkSync(thumbnailPath); } catch (e) { }
+
+            } else {
+                finalUrl = `/uploads/${finalFilename}`;
+                metadata = {
+                    poster: `/uploads/${thumbnailFilename}`,
+                    duration: duration
+                };
+            }
+        }
+
+        return (this.prisma as any).media.create({
+            data: {
+                filename: finalFilename,
+                url: finalUrl,
+                mimetype: finalMimeType,
+                size: file.size,
+                width,
+                height,
+                metadata,
+            },
+        });
+    }
+
+    async findAll() {
+        return (this.prisma as any).media.findMany({
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    async update(id: string, data: { altText?: string, folder?: string }) {
+        return (this.prisma as any).media.update({
+            where: { id },
+            data,
+        });
+    }
+
+    async remove(id: string) {
+        const item = await (this.prisma as any).media.findUnique({ where: { id } });
+        if (item) {
+            const isCloudinary = item.url.startsWith('http');
+
+            if (!isCloudinary) {
+                const uploadDir = './uploads';
+                const mainPath = path.join(uploadDir, path.basename(item.url));
+                if (fs.existsSync(mainPath)) fs.unlinkSync(mainPath);
+
+                if (item.metadata && (item.metadata as any).versions) {
+                    const versions = (item.metadata as any).versions;
+                    for (const vUrl of Object.values(versions)) {
+                        const vPath = path.join(uploadDir, path.basename(vUrl as string));
+                        if (fs.existsSync(vPath)) fs.unlinkSync(vPath);
+                    }
+                }
+            }
+        }
+        return (this.prisma as any).media.delete({
+            where: { id },
+        });
+    }
+
+    async migrateLocalToCloud() {
+        const useCloudinary = await this.configureCloudinary();
+        if (!useCloudinary) {
+            throw new Error('Cloudinary is not configured. Please add credentials in Settings.');
+        }
+
+        const allMedia = await (this.prisma as any).media.findMany();
+        const localMedia = allMedia.filter((item: any) => item.url.startsWith('/uploads/'));
+
+        const results = {
+            total: localMedia.length,
+            migrated: 0,
+            errors: [] as string[],
+        };
+
+        for (const item of localMedia) {
+            try {
+                const uploadDir = './uploads';
+                const mainPath = path.join(uploadDir, path.basename(item.url));
+
+                if (!fs.existsSync(mainPath)) {
+                    results.errors.push(`File not found: ${item.filename}`);
+                    continue;
+                }
+
+                // Upload main file
+                const cloudUrl = await this.uploadToCloud(mainPath, 'cms_uploads', item.mimetype.startsWith('video/') ? 'video' : 'image');
+
+                // Handle versions if they exist
+                const updatedMetadata = { ...item.metadata };
+                if (item.metadata && (item.metadata as any).versions) {
+                    const versions = (item.metadata as any).versions;
+                    const newVersions: any = {};
+
+                    for (const [key, vUrl] of Object.entries(versions)) {
+                        const vPath = path.join(uploadDir, path.basename(vUrl as string));
+                        if (fs.existsSync(vPath)) {
+                            newVersions[key] = await this.uploadToCloud(vPath);
+                            try { fs.unlinkSync(vPath); } catch (e) { }
+                        }
+                    }
+                    updatedMetadata.versions = newVersions;
+                }
+
+                // Update database
+                await (this.prisma as any).media.update({
+                    where: { id: item.id },
+                    data: {
+                        url: cloudUrl,
+                        metadata: updatedMetadata,
+                    },
+                });
+
+                // Delete local main file
+                try { fs.unlinkSync(mainPath); } catch (e) { }
+
+                // Handle poster if video
+                if (item.metadata && (item.metadata as any).poster) {
+                    const posterPath = path.join(uploadDir, path.basename((item.metadata as any).poster));
+                    if (fs.existsSync(posterPath)) {
+                        const posterUrl = await this.uploadToCloud(posterPath);
+                        updatedMetadata.poster = posterUrl;
+                        await (this.prisma as any).media.update({
+                            where: { id: item.id },
+                            data: { metadata: updatedMetadata },
+                        });
+                        try { fs.unlinkSync(posterPath); } catch (e) { }
+                    }
+                }
+
+                results.migrated++;
+                this.logger.log(`Migrated: ${item.filename}`);
+            } catch (error) {
+                this.logger.error(`Failed to migrate ${item.filename}`, error);
+                results.errors.push(`${item.filename}: ${error.message}`);
+            }
+        }
+
+        return results;
+    }
+}

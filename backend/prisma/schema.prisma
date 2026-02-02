@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  password            String
+  name                String?
+  bio                 String?
+  avatar              String?
+  roleId              String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  forcePasswordChange Boolean  @default(false)
+  ipWhitelist         String[] @default([])
+  twoFactorEnabled    Boolean  @default(false)
+  twoFactorSecret     String?
+  failedLoginAttempts Int      @default(0)
+  lockoutUntil        DateTime?
+  preferences         Json?
+  activityLogs        ActivityLog[]
+  posts               Post[]
+  comments            Comment[]
+  role                Role     @relation(fields: [roleId], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  metadata  Json?
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  status    String   @default("INFO") // INFO, WARNING, DANGER
+}
+
+model Invitation {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  roleId      String
+  ipWhitelist String[] @default([])
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  status      String   @default("PENDING")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  icon        String?
+  permissions Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model Post {
+  id          String    @id @default(uuid())
+  title       String
+  slug        String    @unique
+  content     String
+  excerpt     String?
+  coverImage  String?
+  status      String    @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED, SCHEDULED
+  featured    Boolean   @default(false)
+  publishedAt DateTime?
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  categories  Category[]
+  tags        Tag[]
+  comments    Comment[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  posts       Post[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  posts     Post[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  content     String
+  authorName  String
+  authorEmail String
+  status      String   @default("PENDING") // PENDING, APPROVED, SPAM
+  postId      String
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Media {
+  id          String   @id @default(uuid())
+  filename    String
+  url         String
+  mimetype    String
+  size        Int
+  width       Int?
+  height      Int?
+  altText     String?
+  folder      String   @default("root")
+  metadata    Json?    // Stores { versions: { small: string, medium: string, etc } }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SeoMeta {
+  id                 String   @id @default(uuid())
+  pageType           String   // 'post', 'page', 'category', 'tag', 'home'
+  pageId             String?  // Reference to Post, Page, etc.
+  title              String?
+  description        String?
+  keywords           String[]
+  ogTitle            String?
+  ogDescription      String?
+  ogImage            String?
+  twitterCard        String?  @default("summary_large_image")
+  twitterTitle       String?
+  twitterDescription String?
+  twitterImage       String?
+  canonicalUrl       String?
+  noindex            Boolean  @default(false)
+  nofollow           Boolean  @default(false)
+  schema             Json?    // JSON-LD structured data
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([pageType, pageId])
+}
+
+model Redirect {
+  id        String   @id @default(uuid())
+  fromPath  String   @unique
+  toPath    String
+  type      Int      @default(301) // 301 or 302
+  isActive  Boolean  @default(true)
+  hits      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AnalyticsConfig {
+  id               String   @id @default(uuid())
+  ga4MeasurementId String?
+  gscPropertyUrl   String?
+  fbPixelId        String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model RobotsTxt {
+  id        String   @id @default(uuid())
+  content   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
