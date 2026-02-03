@@ -141,6 +141,7 @@ export default function UsersPage() {
 
             if (response.ok) {
                 showToast('Invitation sent successfully', 'success');
+                setIsInviteModalOpen(false);
                 fetchUsers();
                 fetchStats();
             } else {
