@@ -11,14 +11,14 @@ export class MailService {
 
     private async createTransporter() {
         const settings = await this.settingsService.findAll();
-        const host = settings['smtp_host'] as string;
-        const port = Number(settings['smtp_port']);
-        const user = settings['smtp_user'] as string;
-        const pass = settings['smtp_pass'] as string;
-        const secure = settings['smtp_secure'] === 'true';
+        const host = (settings['smtp_host'] || process.env.SMTP_HOST) as string;
+        const port = Number(settings['smtp_port'] || process.env.SMTP_PORT || 587);
+        const user = (settings['smtp_user'] || process.env.SMTP_USER) as string;
+        const pass = (settings['smtp_pass'] || process.env.SMTP_PASS) as string;
+        const secure = (settings['smtp_secure'] === 'true') || (process.env.SMTP_SECURE === 'true');
 
         if (!host || !user || !pass) {
-            this.logger.warn('SMTP settings are missing. Email sending disabled.');
+            this.logger.warn('SMTP settings are missing in both DB and Environment. Email sending disabled.');
             return null;
         }
 

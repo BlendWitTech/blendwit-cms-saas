@@ -32,9 +32,9 @@ export class MediaService {
 
     private async configureCloudinary() {
         const settings = await this.settingsService.findAll();
-        const cloudName = settings['cloudinary_cloud_name'];
-        const apiKey = settings['cloudinary_api_key'];
-        const apiSecret = settings['cloudinary_api_secret'];
+        const cloudName = settings['cloudinary_cloud_name'] || process.env.CLOUDINARY_CLOUD_NAME;
+        const apiKey = settings['cloudinary_api_key'] || process.env.CLOUDINARY_API_KEY;
+        const apiSecret = settings['cloudinary_api_secret'] || process.env.CLOUDINARY_API_SECRET;
 
         if (cloudName && apiKey && apiSecret) {
             cloudinary.config({
@@ -62,11 +62,11 @@ export class MediaService {
 
     private async configureS3() {
         const settings = await this.settingsService.findAll();
-        const accessKey = settings['s3_access_key'];
-        const secretKey = settings['s3_secret_key'];
-        const bucket = settings['s3_bucket'];
-        const region = settings['s3_region'] || 'auto';
-        const endpoint = settings['s3_endpoint'];
+        const accessKey = settings['s3_access_key'] || process.env.S3_ACCESS_KEY;
+        const secretKey = settings['s3_secret_key'] || process.env.S3_SECRET_KEY;
+        const bucket = settings['s3_bucket'] || process.env.S3_BUCKET;
+        const region = settings['s3_region'] || process.env.S3_REGION || 'auto';
+        const endpoint = settings['s3_endpoint'] || process.env.S3_ENDPOINT;
 
         if (accessKey && secretKey && bucket) {
             this.s3Client = new S3Client({
