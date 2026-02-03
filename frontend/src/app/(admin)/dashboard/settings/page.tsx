@@ -40,6 +40,17 @@ export default function SettingsPage() {
     const [logsTotal, setLogsTotal] = useState(0);
     const [isLogsLoading, setIsLogsLoading] = useState(false);
     const [logsPagination, setLogsPagination] = useState({ skip: 0, take: 10 });
+    const [editModes, setEditModes] = useState<Record<string, boolean>>({});
+
+    const isSectionEditing = (section: string, keys: string[]) => {
+        if (editModes[section]) return true;
+        // If all keys in this section are empty, assume we are in "add" mode
+        return keys.every(key => !settings[key]);
+    };
+
+    const toggleEdit = (section: string) => {
+        setEditModes(prev => ({ ...prev, [section]: !prev[section] }));
+    };
 
     useEffect(() => {
         apiRequest('/settings')
@@ -69,14 +80,14 @@ export default function SettingsPage() {
         }
     }, [activeTab, logsPagination]);
 
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSave = async (section: string) => {
         try {
             await apiRequest('/settings', {
                 method: 'PATCH',
                 body: settings,
             });
             showToast('Settings successfully synchronized cross-platform.', 'success');
+            setEditModes(prev => ({ ...prev, [section]: false }));
         } catch (error: any) {
             console.error(error);
             showToast(error.message || 'Failed to update system configurations.', 'error');
@@ -129,9 +140,19 @@ export default function SettingsPage() {
                             <div className="bg-white rounded-[3rem] p-10 lg:p-12 shadow-2xl shadow-slate-200/40 border border-slate-200/60 space-y-10 relative overflow-hidden group">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-colors"></div>
 
-                                <div className="space-y-2">
-                                    <h3 className="text-xl font-bold text-slate-900 font-display">Identity & SEO</h3>
-                                    <p className="text-sm font-medium text-slate-400">Configure how your site appears to engines and users.</p>
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-2">
+                                        <h3 className="text-xl font-bold text-slate-900 font-display">Identity & SEO</h3>
+                                        <p className="text-sm font-medium text-slate-400">Configure how your site appears to engines and users.</p>
+                                    </div>
+                                    {!isSectionEditing('branding', ['site_title', 'site_tagline', 'copyright_text']) && (
+                                        <button
+                                            onClick={() => toggleEdit('branding')}
+                                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                        >
+                                            Edit Details
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -139,18 +160,20 @@ export default function SettingsPage() {
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Master Site Title</label>
                                         <input
                                             type="text"
+                                            disabled={!isSectionEditing('branding', ['site_title', 'site_tagline', 'copyright_text'])}
                                             value={settings.site_title || ''}
                                             onChange={(e) => setSettings({ ...settings, site_title: e.target.value })}
-                                            className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all"
+                                            className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all disabled:opacity-60"
                                         />
                                     </div>
                                     <div className="space-y-3">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">App Tagline</label>
                                         <input
                                             type="text"
+                                            disabled={!isSectionEditing('branding', ['site_title', 'site_tagline', 'copyright_text'])}
                                             value={settings.site_tagline || ''}
                                             onChange={(e) => setSettings({ ...settings, site_tagline: e.target.value })}
-                                            className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all"
+                                            className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all disabled:opacity-60"
                                         />
                                     </div>
                                 </div>
@@ -159,11 +182,33 @@ export default function SettingsPage() {
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Copyright Disclaimer</label>
                                     <input
                                         type="text"
+                                        disabled={!isSectionEditing('branding', ['site_title', 'site_tagline', 'copyright_text'])}
                                         value={settings.copyright_text || ''}
                                         onChange={(e) => setSettings({ ...settings, copyright_text: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:ring-[12px] focus:ring-blue-600/5 transition-all"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:ring-[12px] focus:ring-blue-600/5 transition-all disabled:opacity-60"
                                     />
                                 </div>
+
+                                {isSectionEditing('branding', ['site_title', 'site_tagline', 'copyright_text']) && editModes['branding'] && (
+                                    <div className="flex gap-4 pt-4">
+                                        <button
+                                            onClick={() => handleSave('branding')}
+                                            className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
+                                        >
+                                            Save Changes
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                toggleEdit('branding');
+                                                // Reload settings on cancel
+                                                apiRequest('/settings').then(setSettings);
+                                            }}
+                                            className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -185,14 +230,24 @@ export default function SettingsPage() {
                     <div className="bg-white rounded-[3rem] p-10 lg:p-12 shadow-2xl shadow-slate-200/40 border border-slate-200/60 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl"></div>
 
-                        <div className="flex items-center gap-4 mb-8 relative z-10">
-                            <div className="p-3 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
-                                <EnvelopeIcon className="h-6 w-6" />
+                        <div className="flex items-center justify-between mb-8 relative z-10">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
+                                    <EnvelopeIcon className="h-6 w-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold text-slate-900 font-display">SMTP Configuration</h3>
+                                    <p className="text-sm font-medium text-slate-400">Manage transactional email delivery.</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-900 font-display">SMTP Configuration</h3>
-                                <p className="text-sm font-medium text-slate-400">Manage transactional email delivery.</p>
-                            </div>
+                            {!isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass']) && (
+                                <button
+                                    onClick={() => toggleEdit('email')}
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                >
+                                    Edit SMTP
+                                </button>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
@@ -200,9 +255,10 @@ export default function SettingsPage() {
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">SMTP Host</label>
                                 <input
                                     type="text"
+                                    disabled={!isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass'])}
                                     value={settings.smtp_host || ''}
                                     onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
-                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all"
+                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all disabled:opacity-60"
                                     placeholder="smtp.example.com"
                                 />
                             </div>
@@ -210,9 +266,10 @@ export default function SettingsPage() {
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">SMTP Port</label>
                                 <input
                                     type="text"
+                                    disabled={!isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass'])}
                                     value={settings.smtp_port || ''}
                                     onChange={(e) => setSettings({ ...settings, smtp_port: e.target.value })}
-                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all"
+                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all disabled:opacity-60"
                                     placeholder="587"
                                 />
                             </div>
@@ -220,24 +277,27 @@ export default function SettingsPage() {
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Username</label>
                                 <input
                                     type="text"
+                                    disabled={!isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass'])}
                                     value={settings.smtp_user || ''}
                                     onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
-                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all"
+                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all disabled:opacity-60"
                                 />
                             </div>
                             <div className="space-y-3">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Password</label>
                                 <input
                                     type="password"
+                                    disabled={!isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass'])}
                                     value={settings.smtp_pass || ''}
                                     onChange={(e) => setSettings({ ...settings, smtp_pass: e.target.value })}
-                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all"
+                                    className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-emerald-500/5 focus:bg-white focus:border-emerald-500/20 transition-all disabled:opacity-60"
                                 />
                             </div>
                             <div className="md:col-span-2">
                                 <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-white transition-colors">
                                     <input
                                         type="checkbox"
+                                        disabled={!isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass'])}
                                         checked={settings.smtp_secure === 'true'}
                                         onChange={(e) => setSettings({ ...settings, smtp_secure: String(e.target.checked) })}
                                         className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
@@ -246,9 +306,28 @@ export default function SettingsPage() {
                                 </label>
                             </div>
                         </div>
-                        <div className="mt-8 flex justify-end relative z-10">
-                            <button onClick={handleSave} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all">Save Email Settings</button>
-                        </div>
+
+                        {isSectionEditing('email', ['smtp_host', 'smtp_user', 'smtp_pass']) && (
+                            <div className="mt-8 flex justify-end gap-4 relative z-10">
+                                <button
+                                    onClick={() => handleSave('email')}
+                                    className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all"
+                                >
+                                    Save Email Settings
+                                </button>
+                                {editModes['email'] && (
+                                    <button
+                                        onClick={() => {
+                                            toggleEdit('email');
+                                            apiRequest('/settings').then(setSettings);
+                                        }}
+                                        className="bg-slate-100 text-slate-500 px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
+                                    >
+                                        Cancel
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -259,14 +338,24 @@ export default function SettingsPage() {
                         <div className="bg-white rounded-[3rem] p-10 lg:p-12 shadow-2xl shadow-slate-200/40 border border-slate-200/60 relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
 
-                            <div className="flex items-center gap-4 mb-8 relative z-10">
-                                <div className="p-3 bg-blue-600 rounded-2xl shadow-xl shadow-blue-500/20 text-white">
-                                    <CloudIcon className="h-6 w-6" />
+                            <div className="flex items-center justify-between mb-8 relative z-10">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-blue-600 rounded-2xl shadow-xl shadow-blue-500/20 text-white">
+                                        <CloudIcon className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-slate-900 font-display">Cloudinary</h3>
+                                        <p className="text-sm font-medium text-slate-400">External media storage and transformation.</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-slate-900 font-display">Cloudinary</h3>
-                                    <p className="text-sm font-medium text-slate-400">External media storage and transformation.</p>
-                                </div>
+                                {!isSectionEditing('cloudinary', ['cloudinary_cloud_name', 'cloudinary_api_key', 'cloudinary_api_secret']) && (
+                                    <button
+                                        onClick={() => toggleEdit('cloudinary')}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        Edit Cloudinary
+                                    </button>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
@@ -274,44 +363,77 @@ export default function SettingsPage() {
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Cloud Name</label>
                                     <input
                                         type="text"
+                                        disabled={!isSectionEditing('cloudinary', ['cloudinary_cloud_name', 'cloudinary_api_key', 'cloudinary_api_secret'])}
                                         value={settings.cloudinary_cloud_name || ''}
                                         onChange={(e) => setSettings({ ...settings, cloudinary_cloud_name: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all disabled:opacity-60"
                                     />
                                 </div>
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">API Key</label>
                                     <input
                                         type="text"
+                                        disabled={!isSectionEditing('cloudinary', ['cloudinary_cloud_name', 'cloudinary_api_key', 'cloudinary_api_secret'])}
                                         value={settings.cloudinary_api_key || ''}
                                         onChange={(e) => setSettings({ ...settings, cloudinary_api_key: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all disabled:opacity-60"
                                     />
                                 </div>
                                 <div className="md:col-span-2 space-y-3">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">API Secret</label>
                                     <input
                                         type="password"
+                                        disabled={!isSectionEditing('cloudinary', ['cloudinary_cloud_name', 'cloudinary_api_key', 'cloudinary_api_secret'])}
                                         value={settings.cloudinary_api_secret || ''}
                                         onChange={(e) => setSettings({ ...settings, cloudinary_api_secret: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all opacity-50 focus:opacity-100"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-blue-600/5 focus:bg-white focus:border-blue-600/20 transition-all opacity-50 focus:opacity-100 disabled:opacity-60"
                                     />
                                 </div>
                             </div>
+
+                            {isSectionEditing('cloudinary', ['cloudinary_cloud_name', 'cloudinary_api_key', 'cloudinary_api_secret']) && editModes['cloudinary'] && (
+                                <div className="flex gap-4 pt-8 relative z-10">
+                                    <button
+                                        onClick={() => handleSave('cloudinary')}
+                                        className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
+                                    >
+                                        Save Cloudinary
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            toggleEdit('cloudinary');
+                                            apiRequest('/settings').then(setSettings);
+                                        }}
+                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* S3 / R2 Section */}
                         <div className="bg-white rounded-[3rem] p-10 lg:p-12 shadow-2xl shadow-slate-200/40 border border-slate-200/60 relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/5 rounded-full blur-3xl"></div>
 
-                            <div className="flex items-center gap-4 mb-8 relative z-10">
-                                <div className="p-3 bg-orange-600 rounded-2xl shadow-xl shadow-orange-500/20 text-white">
-                                    <ServerStackIcon className="h-6 w-6" />
+                            <div className="flex items-center justify-between mb-8 relative z-10">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-orange-600 rounded-2xl shadow-xl shadow-orange-500/20 text-white">
+                                        <ServerStackIcon className="h-6 w-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-slate-900 font-display">S3 / R2 / Object Storage</h3>
+                                        <p className="text-sm font-medium text-slate-400">AWS S3, Cloudflare R2, or any S3-compatible storage.</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-slate-900 font-display">S3 / R2 / Object Storage</h3>
-                                    <p className="text-sm font-medium text-slate-400">AWS S3, Cloudflare R2, or any S3-compatible storage.</p>
-                                </div>
+                                {!isSectionEditing('s3', ['s3_access_key', 's3_bucket']) && (
+                                    <button
+                                        onClick={() => toggleEdit('s3')}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        Edit S3
+                                    </button>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
@@ -319,40 +441,64 @@ export default function SettingsPage() {
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Access Key ID</label>
                                     <input
                                         type="text"
+                                        disabled={!isSectionEditing('s3', ['s3_access_key', 's3_bucket'])}
                                         value={settings.s3_access_key || ''}
                                         onChange={(e) => setSettings({ ...settings, s3_access_key: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all disabled:opacity-60"
                                     />
                                 </div>
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Secret Access Key</label>
                                     <input
                                         type="password"
+                                        disabled={!isSectionEditing('s3', ['s3_access_key', 's3_bucket'])}
                                         value={settings.s3_secret_key || ''}
                                         onChange={(e) => setSettings({ ...settings, s3_secret_key: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all opacity-50 focus:opacity-100"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all opacity-50 focus:opacity-100 disabled:opacity-60"
                                     />
                                 </div>
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Bucket Name</label>
                                     <input
                                         type="text"
+                                        disabled={!isSectionEditing('s3', ['s3_access_key', 's3_bucket'])}
                                         value={settings.s3_bucket || ''}
                                         onChange={(e) => setSettings({ ...settings, s3_bucket: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all disabled:opacity-60"
                                     />
                                 </div>
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] ml-2">Endpoint URL (Optional)</label>
                                     <input
                                         type="text"
+                                        disabled={!isSectionEditing('s3', ['s3_access_key', 's3_bucket'])}
                                         value={settings.s3_endpoint || ''}
                                         onChange={(e) => setSettings({ ...settings, s3_endpoint: e.target.value })}
-                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all"
+                                        className="w-full bg-slate-50/50 border border-slate-100 rounded-2xl py-4 px-6 text-sm font-bold text-slate-900 focus:outline-none focus:ring-[12px] focus:ring-orange-600/5 focus:bg-white focus:border-orange-600/20 transition-all disabled:opacity-60"
                                         placeholder="e.g. https://<id>.r2.cloudflarestorage.com"
                                     />
                                 </div>
                             </div>
+
+                            {isSectionEditing('s3', ['s3_access_key', 's3_bucket']) && editModes['s3'] && (
+                                <div className="flex gap-4 pt-8 relative z-10">
+                                    <button
+                                        onClick={() => handleSave('s3')}
+                                        className="bg-orange-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-orange-500/20 hover:bg-orange-700 transition-all"
+                                    >
+                                        Save S3 Settings
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            toggleEdit('s3');
+                                            apiRequest('/settings').then(setSettings);
+                                        }}
+                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex justify-between items-center p-8 bg-slate-900 rounded-[3rem] text-white overflow-hidden relative group">
