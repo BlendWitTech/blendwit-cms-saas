@@ -59,6 +59,39 @@ export class InvitationsService {
         });
     }
 
+    async resendInvitation(id: string) {
+        const invitation = await (this.prisma as any).invitation.findUnique({ where: { id } });
+        if (!invitation || invitation.status !== 'PENDING') {
+            throw new BadRequestException('Invitation not found or no longer pending.');
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 48);
+
+        const updated = await (this.prisma as any).invitation.update({
+            where: { id },
+            data: { token, expiresAt },
+        });
+
+        const inviteLink = `http://localhost:3000/register?token=${token}`;
+        const html = `
+            <h3>Invitation Resent: Join Blendwit CMS</h3>
+            <p>Your invitation to join the Blendwit team has been updated. Please click the link below to set up your account:</p>
+            <a href="${inviteLink}">${inviteLink}</a>
+            <p>This link expires in 48 hours.</p>
+        `;
+
+        const mailResult = await this.mailService.sendMail(invitation.email, 'Updated Invitation: Blendwit CMS', html);
+        if (!mailResult) {
+            this.logger.error(`Failed to resend invitation email to ${invitation.email}`);
+            throw new BadRequestException('Failed to send email. Please check SMTP configuration.');
+        }
+
+        this.logger.log(`Invitation resent to ${invitation.email}`);
+        return updated;
+    }
+
     async revokeInvitation(id: string) {
         return (this.prisma as any).invitation.update({
             where: { id },

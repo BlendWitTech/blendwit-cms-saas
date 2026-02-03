@@ -21,6 +21,15 @@ export class InvitationsController {
         }
     }
 
+    @Post(':id/resend')
+    async resend(@Param('id') id: string) {
+        try {
+            return await this.invitationsService.resendInvitation(id);
+        } catch (error: any) {
+            throw new BadRequestException(error.message || 'Failed to resend invitation');
+        }
+    }
+
     @Get()
     async findAll() {
         return this.invitationsService.getInvitations();

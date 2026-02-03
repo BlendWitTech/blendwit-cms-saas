@@ -154,6 +154,28 @@ export default function UsersPage() {
         }
     };
 
+    const handleResend = async (id: string) => {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`http://localhost:3001/invitations/${id}/resend`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                showToast('Invitation resent successfully', 'success');
+            } else {
+                const err = await response.json();
+                showToast(err.message || 'Failed to resend invitation', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to resend invite:', error);
+            showToast('Connection error occurred', 'error');
+        }
+    };
+
     const handle2faVerify = async (tokenInput: string) => {
         const token = localStorage.getItem('token');
         try {
