@@ -392,7 +392,7 @@ export default function UsersPage() {
                                         <td className="pr-6 py-4 text-right">
                                             {user.status === 'Pending' ? (
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button className="px-3 py-1.5 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all border border-blue-100 uppercase tracking-widest whitespace-nowrap">Resend</button>
+                                                    <button onClick={() => handleResend(user.id)} className="px-3 py-1.5 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all border border-blue-100 uppercase tracking-widest whitespace-nowrap">Resend</button>
                                                     <button className="px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all uppercase tracking-widest">Revoke</button>
                                                 </div>
                                             ) : (
