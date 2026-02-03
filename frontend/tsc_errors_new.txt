@@ -1,3 +1,0 @@
-src/components/blog/PostEditor.tsx(28,5): error TS2724: '"@heroicons/react/24/outline"' has no exported member named 'Bars3LeftIcon'. Did you mean 'Bars3Icon'?
-src/components/blog/PostEditor.tsx(30,5): error TS2305: Module '"@heroicons/react/24/outline"' has no exported member 'Bars3RightIcon'.
-src/components/ui/ConfirmationModal.tsx(2,36): error TS2307: Cannot find module '@headlessui/react' or its corresponding type declarations.
