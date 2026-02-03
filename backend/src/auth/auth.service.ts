@@ -120,7 +120,7 @@ export class AuthService {
         const token = Math.random().toString(36).substring(2, 15);
         await this.auditLogService.log(user.id, 'PASSWORD_RESET_REQUEST', { token }, 'WARNING');
 
-        console.log(`[EMAIL MOCK] Reset Token for ${email}: ${token}`);
+        // In production, an actual email would be sent here
         return { message: 'If user exists, email sent' };
     }
 

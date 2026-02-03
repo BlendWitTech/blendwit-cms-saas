@@ -7,21 +7,17 @@ export class AnalyticsService {
 
     async getConfig() {
         try {
-            console.log('Fetching analytics config...');
             const config = await this.prisma.analyticsConfig.findFirst({
                 where: { isActive: true },
             });
-            console.log('Found config:', config);
 
             if (!config) {
-                console.log('Creating default analytics config...');
                 // Create default config
                 const newConfig = await this.prisma.analyticsConfig.create({
                     data: {
                         isActive: true,
                     },
                 });
-                console.log('Created new config:', newConfig);
                 return newConfig;
             }
 

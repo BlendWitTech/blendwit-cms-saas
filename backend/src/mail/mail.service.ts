@@ -40,11 +40,8 @@ export class MailService {
                 // Fallback: Log to console in development
                 if (process.env.NODE_ENV === 'development') {
                     this.logger.warn('SMTP not configured. Logging email to console (DEV MODE):');
-                    console.log('\n========== EMAIL ==========');
-                    console.log(`To: ${to}`);
-                    console.log(`Subject: ${subject}`);
-                    console.log(`Body:\n${html}`);
-                    console.log('===========================\n');
+                    // In production, use transport.sendMail
+                    // For now, we'll keep the mock silent or use a proper logger
                     return true;
                 } else {
                     this.logger.error('SMTP settings missing in PRODUCTION. Email not sent.');

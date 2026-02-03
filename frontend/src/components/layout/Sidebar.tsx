@@ -300,16 +300,16 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         } catch (error) {
             console.error('Failed to check theme status:', error);
             // Fallback: Assume no theme if error
-            setNavItems(prev => prev.map(item => {
+            setNavItems(prev => prev.map((item: any) => {
                 if (item.name === 'Site Pages') {
+                    const { children, ...rest } = item;
                     return {
-                        ...item,
-                        href: '/dashboard/pages',
-                        children: []
+                        ...rest,
+                        href: '/dashboard/pages'
                     };
                 }
                 return item;
-            }));
+            }) as any);
         }
     };
 
