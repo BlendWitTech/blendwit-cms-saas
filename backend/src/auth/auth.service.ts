@@ -16,12 +16,17 @@ export class AuthService {
 
     async validateUser(email: string, pass: string): Promise<any> {
         const user = await this.usersService.findOne(email);
+        const settings = await (this.prisma as any).setting.findMany();
+        const settingsMap = settings.reduce((acc: any, s: any) => ({ ...acc, [s.key]: s.value }), {});
+
+        const threshold = parseInt(settingsMap['lockout_threshold'] || '5');
+        const duration = parseInt(settingsMap['lockout_duration'] || '15'); // in minutes
 
         if (!user) return null;
 
         // Check for lockout
         if (user.lockoutUntil && user.lockoutUntil > new Date()) {
-            throw new UnauthorizedException('Account is temporarily locked due to multiple failed login attempts. Please try again later.');
+            throw new UnauthorizedException(`Account is temporarily locked due to multiple failed login attempts. Please try again in ${duration} minutes.`);
         }
 
         if (await bcrypt.compare(pass, user.password)) {
@@ -38,7 +43,7 @@ export class AuthService {
 
         // Increment failed attempts
         const attempts = user.failedLoginAttempts + 1;
-        const lockoutUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null; // 15 min lockout
+        const lockoutUntil = attempts >= threshold ? new Date(Date.now() + duration * 60 * 1000) : null;
 
         await (this.prisma as any).user.update({
             where: { id: user.id },
@@ -54,7 +59,7 @@ export class AuthService {
 
 
 
-    async login(user: any) {
+    async login(user: any, rememberMe: boolean = false) {
         if (user.twoFactorEnabled) {
             const tempPayload = { email: user.email, sub: user.id, scope: '2fa_pending' };
             return {
@@ -69,8 +74,11 @@ export class AuthService {
             role: (user as any).role.name,
             forcePasswordChange: user.forcePasswordChange
         };
+
+        const jwtOptions = rememberMe ? { expiresIn: '30d' } : {};
+
         return {
-            access_token: this.jwtService.sign(payload),
+            access_token: this.jwtService.sign(payload, jwtOptions as any),
             forcePasswordChange: user.forcePasswordChange
         };
     }

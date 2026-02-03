@@ -99,12 +99,14 @@ export class PublicBlogsController {
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('category') category?: string,
-        @Query('tag') tag?: string
+        @Query('tag') tag?: string,
+        @Query('featured') featured?: string
     ) {
         const pageNum = parseInt(page || '1', 10);
         const limitNum = parseInt(limit || '10', 10);
+        const isFeatured = featured === 'true';
 
-        return this.blogsService.findPublished(pageNum, limitNum, category, tag);
+        return this.blogsService.findPublished(pageNum, limitNum, category, tag, isFeatured);
     }
 
     @Get(':slug')

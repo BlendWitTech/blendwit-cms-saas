@@ -21,6 +21,16 @@ import { RedirectsModule } from './redirects/redirects.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SitemapModule } from './sitemap/sitemap.module';
 import { RobotsModule } from './robots/robots.module';
+import { MenusModule } from './menus/menus.module';
+import { ProjectsModule } from './projects/projects.module';
+import { TeamModule } from './team/team.module';
+import { TimelineModule } from './timeline/timeline.module';
+import { ServicesModule } from './services/services.module';
+import { TestimonialsModule } from './testimonials/testimonials.module';
+import { LeadsModule } from './leads/leads.module';
+import { ProjectCategoriesModule } from './project-categories/project-categories.module';
+import { PagesModule } from './pages/pages.module';
+import { ThemesModule } from './themes/themes.module';
 
 @Module({
   imports: [
@@ -42,8 +52,19 @@ import { RobotsModule } from './robots/robots.module';
     AnalyticsModule,
     SitemapModule,
     RobotsModule,
+    MenusModule,
+    ProjectsModule,
+    TeamModule,
+    TimelineModule,
+    ServicesModule,
+    TestimonialsModule,
+    LeadsModule,
+    ProjectCategoriesModule,
+    PagesModule,
+    ThemesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule { }
+

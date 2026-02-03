@@ -26,6 +26,26 @@ This repository is organized as a monorepo with the following components:
 
 To get the project up and running on your local machine, please follow the detailed instructions in the [SETUP.md](./SETUP.md) file.
 
+## Quick Start
+
+```bash
+# 1. First time setup (Installs, Envs, DB, Seed)
+npm run setup
+
+# 2. Select environment to run (Dev, Prod, Test)
+npm run start
+```
+
+## Available Scripts
+
+- `npm run setup`: Fully automated setup (Manual or Docker).
+- `npm run reset`: Wipe all local data and reset DB.
+- `npm run start`: Interactive start manager.
+- `npm run db:init`: Run database migrations.
+- `npm run db:seed`: Seed the database.
+- `npm run dev`: Start development environment.
+- `npm run build`: Build both frontend and backend for production.
+
 ## Development
 
 The project uses `concurrently` to run both the frontend and backend development servers with a single command:

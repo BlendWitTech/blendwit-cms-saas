@@ -164,12 +164,13 @@ export class BlogsService {
     }
 
     // Public methods (no auth required)
-    async findPublished(page: number = 1, limit: number = 10, category?: string, tag?: string) {
+    async findPublished(page: number = 1, limit: number = 10, category?: string, tag?: string, featured?: boolean) {
         const skip = (page - 1) * limit;
         const where: any = { status: 'PUBLISHED' };
 
         if (category) where.categories = { some: { slug: category } };
         if (tag) where.tags = { some: { slug: tag } };
+        if (featured) where.featured = true;
 
         const [posts, total] = await Promise.all([
             (this.prisma as any).post.findMany({

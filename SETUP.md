@@ -18,11 +18,23 @@ git clone <repository-url>
 cd cms
 ```
 
-### 2. Install Dependencies
-Install all dependencies for the root, backend, and frontend:
+### 2. Run Automated Setup
+The system includes a smart setup script that handles dependency installation, environment files, and database initialization.
+
 ```bash
-npm run install:all
+npm run setup
 ```
+> Select between **Manual** (using your local PostgreSQL) or **Docker** (to start a containerized database).
+
+---
+
+## Alternative Manual Installation
+If you prefer to run steps individually:
+1. `npm install`
+2. `cp backend/.env.example backend/.env`
+3. `docker-compose up -d`
+4. `npm run db:init`
+5. `npm run db:seed`
 
 ### 3. Environment Configuration
 The backend requires a `.env` file for database connection and secrets. Templates have been provided as `.env.example` in both the root and child directories.

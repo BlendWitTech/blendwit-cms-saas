@@ -7,6 +7,8 @@ import * as fs from 'fs';
 import * as ffmpeg from 'fluent-ffmpeg';
 import * as process from 'process';
 import { v2 as cloudinary } from 'cloudinary';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 
 // Handle ffmpeg paths defensively
 try {
@@ -21,6 +23,7 @@ try {
 @Injectable()
 export class MediaService {
     private readonly logger = new Logger(MediaService.name);
+    private s3Client: S3Client | null = null;
 
     constructor(
         private prisma: PrismaService,
@@ -57,6 +60,55 @@ export class MediaService {
         }
     }
 
+    private async configureS3() {
+        const settings = await this.settingsService.findAll();
+        const accessKey = settings['s3_access_key'];
+        const secretKey = settings['s3_secret_key'];
+        const bucket = settings['s3_bucket'];
+        const region = settings['s3_region'] || 'auto';
+        const endpoint = settings['s3_endpoint'];
+
+        if (accessKey && secretKey && bucket) {
+            this.s3Client = new S3Client({
+                region,
+                endpoint,
+                credentials: {
+                    accessKeyId: accessKey,
+                    secretAccessKey: secretKey,
+                },
+                forcePathStyle: !!endpoint, // Usually needed for non-AWS S3 (R2/Minio)
+            });
+            return { bucket, endpoint };
+        }
+        return null;
+    }
+
+    private async uploadToS3(filePath: string, filename: string, mimeType: string) {
+        const s3Config = await this.configureS3();
+        if (!s3Config || !this.s3Client) throw new Error('S3 not configured');
+
+        const fileStream = fs.createReadStream(filePath);
+        const upload = new Upload({
+            client: this.s3Client,
+            params: {
+                Bucket: s3Config.bucket,
+                Key: `uploads/${filename}`,
+                Body: fileStream,
+                ContentType: mimeType,
+                ACL: 'public-read',
+            },
+        });
+
+        await upload.done();
+
+        if (s3Config.endpoint) {
+            // R2/Custom S3 usually uses a custom domain or the endpoint URL
+            // This is a simplification; in production, you'd likely have a CD_URL setting
+            return `${s3Config.endpoint.replace('https://', `https://${s3Config.bucket}.`)}/uploads/${filename}`;
+        }
+        return `https://${s3Config.bucket}.s3.amazonaws.com/uploads/${filename}`;
+    }
+
     async create(file: Express.Multer.File) {
         const isImage = file.mimetype.startsWith('image/');
         const isVideo = file.mimetype.startsWith('video/');
@@ -78,6 +130,7 @@ export class MediaService {
         let duration: number | null = null;
 
         const useCloudinary = await this.configureCloudinary();
+        const s3Config = await this.configureS3();
 
         if (isImage) {
             const webpFilename = `${filename}.webp`;
@@ -116,6 +169,9 @@ export class MediaService {
                     versionPaths[key] = await this.uploadToCloud(vPath);
                     // Delete local version after upload
                     try { fs.unlinkSync(vPath); } catch (e) { }
+                } else if (s3Config) {
+                    versionPaths[key] = await this.uploadToS3(vPath, `${filename}-${key}.webp`, 'image/webp');
+                    try { fs.unlinkSync(vPath); } catch (e) { }
                 } else {
                     versionPaths[key] = `/uploads/${vFilename}`;
                 }
@@ -127,6 +183,9 @@ export class MediaService {
                 // Upload main image
                 finalUrl = await this.uploadToCloud(webpPath);
                 // Delete local webp
+                try { fs.unlinkSync(webpPath); } catch (e) { }
+            } else if (s3Config) {
+                finalUrl = await this.uploadToS3(webpPath, finalFilename, 'image/webp');
                 try { fs.unlinkSync(webpPath); } catch (e) { }
             } else {
                 finalUrl = `/uploads/${finalFilename}`;

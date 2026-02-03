@@ -15,8 +15,8 @@ export class AuthController {
 
     @UseGuards(LocalAuthGuard)
     @Post('login')
-    async login(@Request() req) {
-        return this.authService.login(req.user);
+    async login(@Request() req, @Body() body: { rememberMe?: boolean }) {
+        return this.authService.login(req.user, body.rememberMe);
     }
 
     @UseGuards(JwtAuthGuard)

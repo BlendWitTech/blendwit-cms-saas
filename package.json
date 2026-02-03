@@ -11,7 +11,12 @@
     "dev:frontend": "npm run dev -w frontend",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
-    "install:all": "npm install"
+    "install:all": "npm install",
+    "setup": "powershell -ExecutionPolicy Bypass -File ./scripts/setup.ps1",
+    "reset": "powershell -ExecutionPolicy Bypass -File ./scripts/reset.ps1",
+    "db:init": "npx prisma migrate dev -w backend",
+    "db:seed": "npm run seed -w backend",
+    "start": "node ./scripts/start.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -4,7 +4,6 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Controller('analytics')
-@UseGuards(JwtAuthGuard)
 export class AnalyticsController {
     constructor(
         private readonly analyticsService: AnalyticsService,
@@ -16,6 +15,7 @@ export class AnalyticsController {
         return this.analyticsService.getConfig();
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post('config')
     async updateConfig(@Body() data: any, @Request() req) {
         const result = await this.analyticsService.updateConfig(data);

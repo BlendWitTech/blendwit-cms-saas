@@ -24,6 +24,7 @@ export class SeoMetaController {
         return this.seoMetaService.findByPage(pageType, pageId);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Post()
     async upsert(@Body() data: any, @Request() req) {
         const result = await this.seoMetaService.upsert(data);

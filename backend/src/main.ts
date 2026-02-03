@@ -28,6 +28,9 @@ async function bootstrap() {
     next();
   }, express.static(uploadsPath));
 
+  const designsPath = join(process.cwd(), 'designs');
+  app.use('/designs', express.static(designsPath));
+
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   await app.listen(process.env.PORT ?? 3001);
 }
