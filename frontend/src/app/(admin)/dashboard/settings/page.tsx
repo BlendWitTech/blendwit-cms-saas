@@ -76,8 +76,10 @@ export default function SettingsPage() {
                 method: 'PATCH',
                 body: settings,
             });
-        } catch (error) {
+            showToast('Settings successfully synchronized cross-platform.', 'success');
+        } catch (error: any) {
             console.error(error);
+            showToast(error.message || 'Failed to update system configurations.', 'error');
         }
     };
 
