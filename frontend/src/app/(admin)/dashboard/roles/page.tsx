@@ -1,0 +1,415 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+    ShieldCheckIcon,
+    PlusIcon,
+    PencilSquareIcon,
+    TrashIcon,
+    UsersIcon,
+    KeyIcon,
+    GlobeAltIcon,
+    PhotoIcon,
+    DocumentTextIcon,
+    CommandLineIcon,
+    PaintBrushIcon,
+    IdentificationIcon,
+    PresentationChartLineIcon,
+    ArchiveBoxIcon,
+    UserGroupIcon,
+    MagnifyingGlassIcon,
+    MusicalNoteIcon,
+    FilmIcon,
+    BeakerIcon,
+    BoltIcon,
+    AcademicCapIcon,
+    GlobeAmericasIcon,
+    ChatBubbleBottomCenterTextIcon,
+    RocketLaunchIcon,
+    ComputerDesktopIcon,
+    SpeakerWaveIcon,
+    QueueListIcon,
+    Squares2X2Icon,
+    BuildingOfficeIcon,
+    CreditCardIcon,
+    Cog6ToothIcon,
+    BriefcaseIcon
+} from '@heroicons/react/24/outline';
+
+function classNames(...classes: string[]) {
+    return classes.filter(Boolean).join(' ');
+}
+
+import Link from 'next/link';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import { useNotification } from '@/context/NotificationContext';
+
+export default function RolesPage() {
+    const { showToast } = useNotification();
+    const [roles, setRoles] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [isLoading, setIsLoading] = useState(true);
+
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        variant: 'danger' | 'info' | 'success';
+        isAlert: boolean;
+        onConfirm?: () => void;
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        variant: 'danger',
+        isAlert: false,
+    });
+
+    const iconMap: Record<string, any> = {
+        ShieldCheckIcon,
+        PencilSquareIcon,
+        PaintBrushIcon,
+        UsersIcon,
+        UserGroupIcon,
+        PresentationChartLineIcon,
+        MagnifyingGlassIcon,
+        KeyIcon,
+        PhotoIcon,
+        FilmIcon,
+        MusicalNoteIcon,
+        DocumentTextIcon,
+        CommandLineIcon,
+        BriefcaseIcon,
+        RocketLaunchIcon,
+        AcademicCapIcon,
+        BeakerIcon,
+        GlobeAmericasIcon,
+        BoltIcon,
+        ChatBubbleBottomCenterTextIcon,
+        ComputerDesktopIcon,
+        SpeakerWaveIcon,
+        QueueListIcon,
+        BuildingOfficeIcon,
+        CreditCardIcon,
+        Cog6ToothIcon,
+        GlobeAltIcon
+    };
+
+    const fetchRoles = async () => {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+        try {
+            const response = await fetch('http://localhost:3001/roles', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            if (!response.ok) {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error('Failed to fetch');
+            }
+            const data = await response.json();
+            if (Array.isArray(data)) {
+                setRoles(data);
+            } else {
+                setRoles([]);
+            }
+        } catch (error) {
+            console.error('Failed to fetch roles:', error);
+            setRoles([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRoles();
+    }, []);
+
+    const deleteRoleAPI = async (id: string) => {
+        const token = localStorage.getItem('token');
+        try {
+            await fetch(`http://localhost:3001/roles/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            fetchRoles();
+        } catch (error) {
+            console.error('Failed to delete role:', error);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        const roleToDelete = roles.find(r => r.id === id);
+        if (roleToDelete?.users?.length > 0) {
+            setConfirmModal({
+                isOpen: true,
+                title: 'Cannot Delete Role',
+                message: 'This role is currently assigned to one or more users. To preserve system integrity, please reassign these users to a different role before deleting this one.',
+                variant: 'info',
+                isAlert: true,
+            });
+            return;
+        }
+
+        setConfirmModal({
+            isOpen: true,
+            title: 'Delete Role?',
+            message: `Are you sure you want to delete the "${roleToDelete?.name}" role? This action cannot be undone.`,
+            variant: 'danger',
+            isAlert: false,
+            onConfirm: () => {
+                deleteRoleAPI(id);
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            }
+        });
+    };
+
+    const permissionIcons = [
+        { key: 'manage_content', icon: DocumentTextIcon, label: 'Content' },
+        { key: 'manage_media', icon: PhotoIcon, label: 'Media' },
+        { key: 'manage_users', icon: UsersIcon, label: 'Users' },
+        { key: 'manage_settings', icon: Cog6ToothIcon, label: 'Settings' },
+        { key: 'all', icon: GlobeAltIcon, label: 'Full Access' },
+    ];
+
+    return (
+        <div className="space-y-8 pb-20">
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                variant={confirmModal.variant}
+                isAlert={confirmModal.isAlert}
+                onConfirm={confirmModal.onConfirm}
+                confirmText="Delete Role"
+            />
+
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight font-display">
+                        Roles & <span className="text-blue-600 font-bold">Permissions</span>
+                    </h1>
+                    <p className="mt-1 text-xs text-slate-500 font-semibold tracking-tight">Define access levels and security policies.</p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {/* View Toggle */}
+                    <div className="flex items-center p-1 bg-slate-100/80 backdrop-blur-sm rounded-xl border border-slate-200/60">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={classNames(
+                                "p-2 rounded-lg transition-all",
+                                viewMode === 'grid' ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5" : "text-slate-400 hover:text-slate-600"
+                            )}
+                        >
+                            <Squares2X2Icon className="h-5 w-5" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={classNames(
+                                "p-2 rounded-lg transition-all",
+                                viewMode === 'list' ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5" : "text-slate-400 hover:text-slate-600"
+                            )}
+                        >
+                            <QueueListIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <Link
+                        href="/dashboard/roles/create"
+                        className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none"
+                    >
+                        <PlusIcon className="h-4 w-4" strokeWidth={3} />
+                        New Role
+                    </Link>
+                </div>
+            </div>
+
+            {/* Content View */}
+            {viewMode === 'grid' ? (
+                /* Grid View */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-2">
+                    {isLoading ? (
+                        [1, 2, 3].map(i => (
+                            <div key={i} className="h-64 rounded-[2.5rem] bg-slate-100 animate-pulse" />
+                        ))
+                    ) : (
+                        roles.map((role) => {
+                            const RoleIcon = iconMap[role.icon || 'ShieldCheckIcon'] || ShieldCheckIcon;
+                            const isSystemRole = role.name === 'Super Admin' || role.name === 'Admin';
+
+                            return (
+                                <div key={role.id} className="group relative overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-sm border border-slate-200/50 hover:shadow-xl hover:shadow-slate-200/20 hover:-translate-y-1 transition-all duration-500">
+                                    <div className="flex items-start justify-between mb-6">
+                                        <div className={classNames(
+                                            "p-4 rounded-2xl border transition-all duration-500",
+                                            isSystemRole ? "bg-blue-600 border-blue-700 text-white shadow-lg shadow-blue-500/20" : "bg-slate-50 border-slate-100 text-slate-400 group-hover:bg-blue-600 group-hover:border-blue-700 group-hover:text-white"
+                                        )}>
+                                            <RoleIcon className="h-6 w-6" />
+                                        </div>
+                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 relative z-10">
+                                            <Link
+                                                href={`/dashboard/roles/${role.id}`}
+                                                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
+                                            >
+                                                <PencilSquareIcon className="h-4 w-4" />
+                                            </Link>
+                                            {!isSystemRole && (
+                                                <button
+                                                    onClick={() => handleDelete(role.id)}
+                                                    className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+                                                >
+                                                    <TrashIcon className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-lg font-bold text-slate-900 font-display">{role.name}</h3>
+                                                {isSystemRole && (
+                                                    <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[8px] font-black text-blue-600 ring-1 ring-blue-600/10 uppercase tracking-tighter">System</span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mt-1">
+                                                <UsersIcon className="h-3 w-3" />
+                                                {role.users?.length || 0} Members Assigned
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2 pt-2">
+                                            {role.name === 'Super Admin' ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-[10px] font-black text-indigo-600 uppercase tracking-widest ring-1 ring-indigo-600/10">
+                                                    <GlobeAltIcon className="h-3 w-3" />
+                                                    Full Access
+                                                </span>
+                                            ) : (
+                                                permissionIcons.map(perm => role.permissions?.[perm.key] && (
+                                                    <span key={perm.key} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-widest ring-1 ring-blue-600/10 transition-colors group-hover:bg-blue-100">
+                                                        <perm.icon className="h-3 w-3" />
+                                                        {perm.label}
+                                                    </span>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Decorative background element */}
+                                    <div className={classNames(
+                                        "absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full blur-3xl transition-colors duration-700",
+                                        isSystemRole ? "bg-blue-600/10" : "bg-blue-600/5 group-hover:bg-blue-600/10"
+                                    )}></div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            ) : (
+                /* List View */
+                <div className="mx-2 bg-white rounded-2xl shadow-sm border border-slate-200/50 overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50 border-b border-slate-100">
+                                    <th className="pl-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role Name</th>
+                                    <th className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Members</th>
+                                    <th className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Permissions</th>
+                                    <th className="pr-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {roles.map((role) => {
+                                    const RoleIcon = iconMap[role.icon || 'ShieldCheckIcon'] || ShieldCheckIcon;
+                                    const isSystemRole = role.name === 'Super Admin' || role.name === 'Admin';
+
+                                    return (
+                                        <tr key={role.id} className="group hover:bg-slate-50/30 transition-colors">
+                                            <td className="pl-8 py-4">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={classNames(
+                                                        "p-2.5 rounded-xl border transition-colors",
+                                                        isSystemRole ? "bg-blue-50 border-blue-100 text-blue-600" : "bg-white border-slate-200 text-slate-400 group-hover:border-blue-200 group-hover:text-blue-500"
+                                                    )}>
+                                                        <RoleIcon className="h-5 w-5" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-bold text-slate-900">{role.name}</span>
+                                                            {isSystemRole && <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[9px] font-black text-blue-600 uppercase tracking-tighter">System</span>}
+                                                        </div>
+                                                        <span className="text-[11px] font-semibold text-slate-400 hidden sm:inline-block">
+                                                            {isSystemRole ? "Core System Role" : "Custom Role"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-slate-500">
+                                                    <UsersIcon className="h-4 w-4 text-slate-400" />
+                                                    <span className="text-xs font-bold">{role.users?.length || 0}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {role.name === 'Super Admin' ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-[10px] font-bold text-indigo-600 uppercase tracking-wide">
+                                                            Full Access
+                                                        </span>
+                                                    ) : (
+                                                        permissionIcons.slice(0, 3).map(perm => role.permissions?.[perm.key] && (
+                                                            <span key={perm.key} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                                                                {perm.label}
+                                                            </span>
+                                                        ))
+                                                    )}
+                                                    {/* Reminder: If more than 3 permissions, show count. (Basic implementation for now) */}
+                                                </div>
+                                            </td>
+                                            <td className="pr-8 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Link
+                                                        href={`/dashboard/roles/${role.id}`}
+                                                        className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                                        title="Edit Role"
+                                                    >
+                                                        <PencilSquareIcon className="h-4 w-4" />
+                                                    </Link>
+                                                    {!isSystemRole && (
+                                                        <button
+                                                            onClick={() => handleDelete(role.id)}
+                                                            className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                            title="Delete Role"
+                                                        >
+                                                            <TrashIcon className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    {roles.length === 0 && !isLoading && (
+                        <div className="p-12 text-center text-slate-400">
+                            <p className="text-sm font-bold">No roles found.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

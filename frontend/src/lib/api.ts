@@ -1,0 +1,59 @@
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
+
+interface RequestOptions {
+    method?: HttpMethod;
+    body?: any;
+    headers?: Record<string, string>;
+    skipNotification?: boolean;
+}
+
+export async function apiRequest(endpoint: string, options: RequestOptions = {}) {
+    const { method = 'GET', body, headers = {}, skipNotification = false } = options;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    const defaultHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+
+    try {
+        const response = await fetch(`http://127.0.0.1:3001${endpoint}`, {
+            method,
+            headers: { ...defaultHeaders, ...headers },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            const errorMessage = data.message || 'An unexpected error occurred';
+            if (!skipNotification && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('api-notification', {
+                    detail: { message: errorMessage, type: 'error' }
+                }));
+            }
+            throw new Error(errorMessage);
+        }
+
+        if (data.message && !skipNotification && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('api-notification', {
+                detail: { message: data.message, type: 'success' }
+            }));
+        }
+
+        return data;
+    } catch (error: any) {
+        // Check if it's a network error (backend not running)
+        if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+            // Silently handle network errors in development
+            console.debug('Backend API not available:', endpoint);
+            throw new Error('Backend API is not available. Please ensure the server is running.');
+        }
+
+        // Log other errors normally only if notification is not skipped
+        if (!skipNotification) {
+            console.error('API Request Error:', error);
+        }
+        throw error;
+    }
+}
