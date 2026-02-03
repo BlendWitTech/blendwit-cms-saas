@@ -52,6 +52,14 @@ export default function SettingsPage() {
         setEditModes(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
+    const handleCancel = (section: string) => {
+        if (confirm('Discard your changes? This action cannot be undone.')) {
+            toggleEdit(section);
+            // Reload settings to revert local state
+            apiRequest('/settings').then(setSettings);
+        }
+    };
+
     useEffect(() => {
         apiRequest('/settings')
             .then(data => {
@@ -198,12 +206,8 @@ export default function SettingsPage() {
                                             Save Changes
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                toggleEdit('branding');
-                                                // Reload settings on cancel
-                                                apiRequest('/settings').then(setSettings);
-                                            }}
-                                            className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                            onClick={() => handleCancel('branding')}
+                                            className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
                                         >
                                             Cancel
                                         </button>
@@ -217,7 +221,7 @@ export default function SettingsPage() {
                                 <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-blue-500/20 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000" />
                                 <h3 className="text-xl font-bold font-display relative z-10">Sync Configuration</h3>
                                 <p className="text-xs font-semibold text-slate-400 mt-2 relative z-10 leading-relaxed mb-8">Updates are broadcasted instantly to all active frontend instances via the core hub.</p>
-                                <button onClick={handleSave} className="w-full bg-white text-slate-900 hover:bg-blue-600 hover:text-white py-5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl relative z-10">
+                                <button onClick={() => handleSave('global')} className="w-full bg-white text-slate-900 hover:bg-blue-600 hover:text-white py-5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl relative z-10">
                                     Push Global Update
                                 </button>
                             </div>
@@ -317,10 +321,7 @@ export default function SettingsPage() {
                                 </button>
                                 {editModes['email'] && (
                                     <button
-                                        onClick={() => {
-                                            toggleEdit('email');
-                                            apiRequest('/settings').then(setSettings);
-                                        }}
+                                        onClick={() => handleCancel('email')}
                                         className="bg-slate-100 text-slate-500 px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
                                     >
                                         Cancel
@@ -400,11 +401,8 @@ export default function SettingsPage() {
                                         Save Cloudinary
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            toggleEdit('cloudinary');
-                                            apiRequest('/settings').then(setSettings);
-                                        }}
-                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        onClick={() => handleCancel('cloudinary')}
+                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
                                     >
                                         Cancel
                                     </button>
@@ -489,11 +487,8 @@ export default function SettingsPage() {
                                         Save S3 Settings
                                     </button>
                                     <button
-                                        onClick={() => {
-                                            toggleEdit('s3');
-                                            apiRequest('/settings').then(setSettings);
-                                        }}
-                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        onClick={() => handleCancel('s3')}
+                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
                                     >
                                         Cancel
                                     </button>
@@ -529,7 +524,7 @@ export default function SettingsPage() {
                                 >
                                     Migrate Local Assets
                                 </button>
-                                <button onClick={handleSave} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all leading-none">
+                                <button onClick={() => handleSave('media')} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all leading-none">
                                     Update Cloud Settings
                                 </button>
                             </div>
