@@ -9,5 +9,6 @@ import { UsersModule } from '../users/users.module';
     imports: [PrismaModule, SeoMetaModule, UsersModule],
     controllers: [PagesController],
     providers: [PagesService],
+    exports: [PagesService],
 })
 export class PagesModule { }
