@@ -17,6 +17,8 @@ export class MailService {
         const pass = (settings['smtp_pass'] || process.env.SMTP_PASS) as string;
         const secure = (settings['smtp_secure'] === 'true') || (process.env.SMTP_SECURE === 'true');
 
+        this.logger.debug(`SMTP Config: host=${host}, port=${port}, user=${user}, secure=${secure}`);
+
         if (!host || !user || !pass) {
             this.logger.warn('SMTP settings are missing in both DB and Environment. Email sending disabled.');
             return null;
@@ -37,16 +39,8 @@ export class MailService {
         try {
             const transporter = await this.createTransporter();
             if (!transporter) {
-                // Fallback: Log to console in development
-                if (process.env.NODE_ENV === 'development') {
-                    this.logger.warn('SMTP not configured. Logging email to console (DEV MODE):');
-                    // In production, use transport.sendMail
-                    // For now, we'll keep the mock silent or use a proper logger
-                    return true;
-                } else {
-                    this.logger.error('SMTP settings missing in PRODUCTION. Email not sent.');
-                    return false;
-                }
+                this.logger.warn(`Email to ${to} not sent: SMTP is not configured.`);
+                return false;
             }
 
             const settings = await this.settingsService.findAll();

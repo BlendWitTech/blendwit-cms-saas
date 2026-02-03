@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
@@ -6,6 +6,8 @@ import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class InvitationsService {
+    private readonly logger = new Logger(InvitationsService.name);
+
     constructor(
         private prisma: PrismaService,
         private mailService: MailService
@@ -21,6 +23,7 @@ export class InvitationsService {
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 48); // 48 hours expiration
 
+        this.logger.log(`Creating invitation for ${data.email} with role ${data.roleId}`);
         const invitation = await (this.prisma as any).invitation.create({
             data: {
                 email: data.email,
@@ -40,8 +43,12 @@ export class InvitationsService {
             <p>This link expires in 48 hours.</p>
         `;
 
-        // Don't wait for email, just log error if fails.
-        this.mailService.sendMail(data.email, 'Invitation to Blendwit CMS', html);
+        const mailResult = await this.mailService.sendMail(data.email, 'Invitation to Blendwit CMS', html);
+        if (!mailResult) {
+            this.logger.error(`Failed to send invitation email to ${data.email}. However, the invitation record was created.`);
+        } else {
+            this.logger.log(`Invitation email successfully sent to ${data.email}`);
+        }
 
         return invitation;
     }
