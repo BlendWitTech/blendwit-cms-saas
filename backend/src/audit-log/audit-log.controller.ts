@@ -1,13 +1,17 @@
 import { Controller, Get, UseGuards, Request, Query } from '@nestjs/common';
 import { AuditLogService } from './audit-log.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
 @Controller('audit-logs')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AuditLogController {
     constructor(private readonly auditLogService: AuditLogService) { }
 
     @Get()
+    @RequirePermissions(Permission.AUDIT_VIEW)
     async getLogs(@Request() req, @Query('limit') limit: string) {
         const user = req.user;
         const limitNum = limit ? parseInt(limit) : 50;

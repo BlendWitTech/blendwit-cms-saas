@@ -32,13 +32,21 @@ export class UsersService {
 
         const [users, total] = await Promise.all([
             (this.prisma as any).user.findMany({
-                where,
+                where: {
+                    ...where,
+                    ...(filters.status ? { status: filters.status } : {}),
+                },
                 include: { role: true },
                 orderBy: { createdAt: 'desc' },
                 skip: filters.skip || 0,
                 take: filters.take || 10,
             }),
-            (this.prisma as any).user.count({ where }),
+            (this.prisma as any).user.count({
+                where: {
+                    ...where,
+                    ...(filters.status ? { status: filters.status } : {}),
+                }
+            }),
         ]);
 
         return { users, total };
@@ -47,7 +55,7 @@ export class UsersService {
     async getStats() {
         const [total, active, recent, pending] = await Promise.all([
             (this.prisma as any).user.count(),
-            (this.prisma as any).user.count({ where: { forcePasswordChange: false } }), // Using forcePasswordChange as proxy for active for now or actual session data later
+            (this.prisma as any).user.count({ where: { status: 'ACTIVE' } }),
             (this.prisma as any).user.count({
                 where: {
                     createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 30)) }
@@ -57,6 +65,12 @@ export class UsersService {
         ]);
 
         return { total, active, recent, pending };
+    }
+
+    async findById(id: string): Promise<User | null> {
+        return (this.prisma as any).user.findUnique({
+            where: { id },
+        });
     }
 
     async remove(id: string): Promise<User> {
@@ -110,6 +124,7 @@ export class UsersService {
     async getActivityLogs(userId: string) {
         return (this.prisma as any).activityLog.findMany({
             where: { userId },
+            include: { user: { select: { name: true, email: true } } },
             orderBy: { createdAt: 'desc' },
             take: 20,
         });
@@ -128,7 +143,7 @@ export class UsersService {
         return { logs, total };
     }
 
-    async findOne(email: string): Promise<User | null> {
+    async findOne(email: string): Promise<(User & { role: any }) | null> {
         return (this.prisma as any).user.findUnique({
             where: { email },
             include: { role: true },
@@ -141,7 +156,55 @@ export class UsersService {
             data: {
                 ...data,
                 password: hashedPassword,
+                status: 'ACTIVE',
             },
         });
+    }
+
+    async updateLastActive(id: string) {
+        return this.prisma.user.update({
+            where: { id },
+            data: { lastActive: new Date() },
+        });
+    }
+
+    async deactivate(id: string) {
+        return this.prisma.user.update({
+            where: { id },
+            data: { status: 'DEACTIVATED' },
+        });
+    }
+
+    async reactivate(id: string, newEmail?: string) {
+        const data: any = { status: 'ACTIVE' };
+        if (newEmail) {
+            data.email = newEmail;
+        }
+        return this.prisma.user.update({
+            where: { id },
+            data,
+        });
+    }
+
+    async transferData(oldUserId: string, newUserId: string) {
+        // Transfer posts
+        await (this.prisma as any).post.updateMany({
+            where: { userId: oldUserId },
+            data: { userId: newUserId },
+        });
+
+        // Transfer comments
+        await (this.prisma as any).comment.updateMany({
+            where: { userId: oldUserId },
+            data: { userId: newUserId },
+        });
+
+        // Transfer activity logs
+        await (this.prisma as any).activityLog.updateMany({
+            where: { userId: oldUserId },
+            data: { userId: newUserId },
+        });
+
+        return { success: true };
     }
 }

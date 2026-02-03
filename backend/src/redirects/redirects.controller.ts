@@ -2,9 +2,12 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request }
 import { RedirectsService } from './redirects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
 @Controller('redirects')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RedirectsController {
     constructor(
         private readonly redirectsService: RedirectsService,
@@ -12,6 +15,7 @@ export class RedirectsController {
     ) { }
 
     @Get()
+    @RequirePermissions(Permission.SEO_MANAGE)
     async findAll() {
         return this.redirectsService.findAll();
     }
@@ -22,6 +26,7 @@ export class RedirectsController {
     }
 
     @Post()
+    @RequirePermissions(Permission.SEO_MANAGE)
     async create(@Body() data: any, @Request() req) {
         const result = await this.redirectsService.create(data);
         await this.auditLog.log(
@@ -33,6 +38,7 @@ export class RedirectsController {
     }
 
     @Patch(':id')
+    @RequirePermissions(Permission.SEO_MANAGE)
     async update(@Param('id') id: string, @Body() data: any, @Request() req) {
         const result = await this.redirectsService.update(id, data);
         await this.auditLog.log(req.user.userId, 'REDIRECT_UPDATE', { id });
@@ -40,6 +46,7 @@ export class RedirectsController {
     }
 
     @Delete(':id')
+    @RequirePermissions(Permission.SEO_MANAGE)
     async delete(@Param('id') id: string, @Request() req) {
         const result = await this.redirectsService.delete(id);
         await this.auditLog.log(req.user.userId, 'REDIRECT_DELETE', { id });

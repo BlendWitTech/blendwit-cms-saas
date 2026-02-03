@@ -39,15 +39,19 @@ export class MailService {
         try {
             const transporter = await this.createTransporter();
             if (!transporter) {
-                this.logger.warn(`Email to ${to} not sent: SMTP is not configured.`);
-                return false;
+                throw new Error('SMTP is not configured. Please check your system settings.');
             }
 
             const settings = await this.settingsService.findAll();
-            const from = settings['smtp_from'] || settings['smtp_user'];
+            const fromEmail = settings['smtp_from'] || settings['smtp_user'];
+            const siteTitle = settings['site_title'] || 'Blendwit CMS';
+
+            if (!fromEmail) {
+                throw new Error('Sender email (SMTP User or From Email) is missing.');
+            }
 
             const info = await transporter.sendMail({
-                from: `"Blendwit CMS" <${from}>`,
+                from: `"${siteTitle}" <${fromEmail}>`,
                 to,
                 subject,
                 html,
@@ -55,9 +59,10 @@ export class MailService {
 
             this.logger.log(`Email sent to ${to}: ${info.messageId}`);
             return true;
-        } catch (error) {
-            this.logger.error(`Failed to send email to ${to}`, error.stack);
-            return false;
+        } catch (error: any) {
+            this.logger.error(`Failed to send email to ${to}: ${error.message}`);
+            // Re-throw so the caller can handle the specific message
+            throw new Error(`Email delivery failed: ${error.message}`);
         }
     }
 }

@@ -2,8 +2,12 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request }
 import { CategoriesService } from './categories.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
 @Controller('categories')
+@UseGuards(PermissionsGuard)
 export class CategoriesController {
     constructor(
         private readonly categoriesService: CategoriesService,
@@ -12,6 +16,7 @@ export class CategoriesController {
 
     @UseGuards(JwtAuthGuard)
     @Post()
+    @RequirePermissions(Permission.CONTENT_CREATE)
     async create(@Body() createCategoryDto: any, @Request() req) {
         const cat = await this.categoriesService.create(createCategoryDto);
         await this.auditLog.log(req.user.userId, 'CATEGORY_CREATE', { name: cat.name });
@@ -30,7 +35,9 @@ export class CategoriesController {
 
     @UseGuards(JwtAuthGuard)
 
+    @UseGuards(JwtAuthGuard)
     @Patch(':id')
+    @RequirePermissions(Permission.CONTENT_EDIT)
     async update(@Param('id') id: string, @Body() updateCategoryDto: any, @Request() req) {
         const cat = await this.categoriesService.update(id, updateCategoryDto);
         await this.auditLog.log(req.user.userId, 'CATEGORY_UPDATE', { id, name: cat.name });
@@ -39,6 +46,7 @@ export class CategoriesController {
 
     @UseGuards(JwtAuthGuard)
     @Delete(':id')
+    @RequirePermissions(Permission.CONTENT_DELETE)
     async remove(@Param('id') id: string, @Request() req) {
         const res = await this.categoriesService.remove(id);
         await this.auditLog.log(req.user.userId, 'CATEGORY_DELETE', { id });

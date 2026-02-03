@@ -7,11 +7,12 @@ export class RolesService {
     constructor(private prisma: PrismaService) { }
 
     async create(createRoleDto: any) {
-        const { name, icon, ...permissions } = createRoleDto;
+        const { name, icon, level, ...permissions } = createRoleDto;
         return (this.prisma as any).role.create({
             data: {
                 name,
                 icon,
+                level: level || 10,
                 permissions: permissions as any,
             },
         });
@@ -20,7 +21,7 @@ export class RolesService {
     async findAll() {
         return (this.prisma as any).role.findMany({
             include: { users: { select: { id: true } } },
-            orderBy: { name: 'asc' },
+            orderBy: [{ level: 'asc' }, { name: 'asc' }],
         });
     }
 
@@ -31,21 +32,25 @@ export class RolesService {
     }
 
     async update(id: string, updateRoleDto: any) {
-        const { name, icon, ...permissions } = updateRoleDto;
+        const { name, icon, level, ...permissions } = updateRoleDto;
 
-        // Protect core roles from renaming
-        if (name) {
-            const currentRole = await (this.prisma as any).role.findUnique({ where: { id } });
-            if (currentRole && (currentRole.name === 'Super Admin' || currentRole.name === 'Admin')) {
-                if (name !== currentRole.name) {
-                    throw new BadRequestException('Cannot rename system roles (Super Admin, Admin).');
-                }
+        const currentRole = await (this.prisma as any).role.findUnique({ where: { id } });
+        if (!currentRole) throw new BadRequestException('Role not found.');
+
+        // Protect core roles from renaming or level changes
+        if (currentRole.name === 'Super Admin' || currentRole.name === 'Admin') {
+            if (name && name !== currentRole.name) {
+                throw new BadRequestException('Cannot rename system roles.');
+            }
+            if (level !== undefined && level !== currentRole.level) {
+                throw new BadRequestException('Cannot change level of system roles.');
             }
         }
 
         const data: any = {};
         if (name) data.name = name;
         if (icon) data.icon = icon;
+        if (level !== undefined) data.level = level;
         if (Object.keys(permissions).length > 0) data.permissions = permissions;
 
         return (this.prisma as any).role.update({

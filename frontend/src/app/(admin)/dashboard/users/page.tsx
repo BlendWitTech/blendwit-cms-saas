@@ -9,14 +9,19 @@ import {
     UserCircleIcon,
     CheckBadgeIcon,
     ShieldCheckIcon,
-    KeyIcon
+    KeyIcon,
+    XMarkIcon
 } from '@heroicons/react/24/outline';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import React, { useState, useEffect } from 'react';
 import InviteUserModal from '@/components/users/InviteUserModal';
+import ReactivationModal from '@/components/users/ReactivationModal';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import UserFilters from '@/components/users/UserFilters';
 import TwoFactorSetup from '@/components/auth/TwoFactorSetup';
 import { useNotification } from '@/context/NotificationContext';
+import { formatDistanceToNow } from 'date-fns';
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ');
@@ -34,6 +39,38 @@ export default function UsersPage() {
     const [is2faModalOpen, setIs2faModalOpen] = useState(false);
     const [filters, setFilters] = useState({ search: '', role: '', status: '', security: '' });
     const [pagination, setPagination] = useState({ skip: 0, take: 10 });
+
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        if (searchParams.get('action') === 'new') {
+            setIsInviteModalOpen(true);
+            router.replace('/dashboard/users', { scroll: false });
+        }
+    }, [searchParams]);
+
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
+    const [userToReactivate, setUserToReactivate] = useState<any>(null);
+    const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+    const [userToDeactivate, setUserToDeactivate] = useState<any>(null);
+
+    const fetchCurrentUser = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        try {
+            const response = await fetch('http://localhost:3001/users/profile', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setCurrentUser(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch profile:', error);
+        }
+    };
 
     const fetchRoles = async () => {
         const token = localStorage.getItem('token');
@@ -103,6 +140,7 @@ export default function UsersPage() {
     };
 
     useEffect(() => {
+        fetchCurrentUser();
         fetchStats();
         fetchRoles();
     }, []);
@@ -110,6 +148,59 @@ export default function UsersPage() {
     useEffect(() => {
         fetchUsers();
     }, [filters, pagination]);
+
+    const handleDeactivate = (user: any) => {
+        setUserToDeactivate(user);
+        setIsDeactivateModalOpen(true);
+    };
+
+    const performDeactivate = async () => {
+        if (!userToDeactivate) return;
+        const id = userToDeactivate.id;
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`http://localhost:3001/users/${id}/deactivate`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                showToast('User deactivated successfully', 'success');
+                setIsDeactivateModalOpen(false);
+                fetchUsers();
+                fetchStats();
+            } else {
+                const err = await response.json();
+                showToast(err.message || 'Failed to deactivate user', 'error');
+            }
+        } catch (error) {
+            showToast('Connection error occurred', 'error');
+        }
+    };
+
+    const handleReactivate = async (id: string, data: { newEmail?: string }) => {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`http://localhost:3001/users/${id}/reactivate`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                showToast('User reactivated successfully', 'success');
+                setIsReactivateModalOpen(false);
+                fetchUsers();
+                fetchStats();
+            } else {
+                const err = await response.json();
+                showToast(err.message || 'Failed to reactivate user', 'error');
+            }
+        } catch (error) {
+            showToast('Connection error occurred', 'error');
+        }
+    };
 
     const toggleUser = (id: string) => {
         if (selectedUsers.includes(id)) {
@@ -176,6 +267,30 @@ export default function UsersPage() {
         }
     };
 
+    const handleRevoke = async (id: string) => {
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`http://localhost:3001/invitations/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                showToast('Invitation revoked successfully', 'success');
+                fetchUsers();
+                fetchStats();
+            } else {
+                const err = await response.json();
+                showToast(err.message || 'Failed to revoke invitation', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to revoke invite:', error);
+            showToast('Connection error occurred', 'error');
+        }
+    };
+
     const handle2faVerify = async (tokenInput: string) => {
         const token = localStorage.getItem('token');
         try {
@@ -229,6 +344,22 @@ export default function UsersPage() {
                 isOpen={is2faModalOpen}
                 onClose={() => setIs2faModalOpen(false)}
                 onVerify={handle2faVerify}
+            />
+            <ReactivationModal
+                isOpen={isReactivateModalOpen}
+                onClose={() => setIsReactivateModalOpen(false)}
+                onReactivate={(data) => handleReactivate(userToReactivate.id, data)}
+                user={userToReactivate}
+                currentUser={currentUser}
+            />
+            <ConfirmationModal
+                isOpen={isDeactivateModalOpen}
+                onClose={() => setIsDeactivateModalOpen(false)}
+                onConfirm={performDeactivate}
+                title="Deactivate User Account"
+                message={`Are you sure you want to deactivate ${userToDeactivate?.name || userToDeactivate?.email}? This user will no longer be able to log in until reactivated.`}
+                confirmText="Deactivate Account"
+                variant="danger"
             />
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
@@ -329,7 +460,10 @@ export default function UsersPage() {
                                 const roleInfo = roleStyles[roleName] || { icon: UserCircleIcon, color: 'text-slate-600 bg-slate-100 ring-slate-600/20' };
 
                                 return (
-                                    <tr key={user.id} className="group hover:bg-slate-50/50 transition-colors">
+                                    <tr key={user.id} className={classNames(
+                                        "group transition-colors",
+                                        user.status === 'DEACTIVATED' ? 'bg-slate-50/80 grayscale-[0.2]' : 'hover:bg-slate-50/50'
+                                    )}>
                                         <td className="pl-6 py-4 text-center">
                                             <input
                                                 type="checkbox"
@@ -341,7 +475,10 @@ export default function UsersPage() {
                                         <td className="px-4 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="relative">
-                                                    <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 ring-1 ring-slate-200">
+                                                    <div className={classNames(
+                                                        "h-10 w-10 rounded-xl flex items-center justify-center text-slate-400 ring-1 ring-slate-200",
+                                                        user.status === 'DEACTIVATED' ? 'bg-slate-200' : 'bg-slate-100'
+                                                    )}>
                                                         <UserCircleIcon className="h-6 w-6" />
                                                     </div>
                                                     {user.ipWhitelist?.length > 0 && (
@@ -352,7 +489,10 @@ export default function UsersPage() {
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-bold text-slate-900 leading-none">{user.name || user.email.split('@')[0]}</p>
+                                                        <p className={classNames(
+                                                            "text-sm font-bold leading-none",
+                                                            user.status === 'DEACTIVATED' ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-900'
+                                                        )}>{user.name || user.email.split('@')[0]}</p>
                                                         {user.twoFactorEnabled && (
                                                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-[8px] font-black text-emerald-600 ring-1 ring-emerald-600/10 uppercase tracking-tighter" title="2FA Active">
                                                                 <ShieldCheckIcon className="h-2 w-2" strokeWidth={3} />
@@ -367,7 +507,7 @@ export default function UsersPage() {
                                         <td className="px-4 py-4">
                                             <span className={classNames(
                                                 "inline-flex items-center gap-x-1.5 rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset",
-                                                roleInfo.color
+                                                user.status === 'DEACTIVATED' ? 'bg-slate-100 text-slate-400 ring-slate-200' : roleInfo.color
                                             )}>
                                                 <roleInfo.icon className="h-3 w-3" />
                                                 {roleName}
@@ -377,28 +517,61 @@ export default function UsersPage() {
                                             <div className="flex items-center gap-2">
                                                 <div className={classNames(
                                                     "h-1.5 w-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)]",
-                                                    user.status === 'Active' || user.type === 'User' ? 'bg-emerald-500 shadow-emerald-500/40' :
-                                                        user.status === 'Pending' ? 'bg-blue-500 animate-pulse' : 'bg-slate-300'
+                                                    user.status === 'ACTIVE' || (user.type === 'User' && user.status !== 'DEACTIVATED') ? 'bg-emerald-500 shadow-emerald-500/40' :
+                                                        user.status === 'Pending' ? 'bg-blue-500 animate-pulse' :
+                                                            user.status === 'DEACTIVATED' ? 'bg-red-400' : 'bg-slate-300'
                                                 )}></div>
                                                 <span className={classNames(
                                                     "text-xs font-bold",
-                                                    user.status === 'Pending' ? 'text-blue-600' : 'text-slate-700'
-                                                )}>{user.type === 'User' ? 'Active' : user.status}</span>
+                                                    user.status === 'Pending' ? 'text-blue-600' :
+                                                        user.status === 'DEACTIVATED' ? 'text-red-600' : 'text-slate-700'
+                                                )}>{user.type === 'User' ? (user.status === 'DEACTIVATED' ? 'Deactivated' : 'Active') : user.status}</span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-4">
-                                            <p className="text-xs font-semibold text-slate-500">{user.lastActive}</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                {user.lastActive ? `${formatDistanceToNow(new Date(user.lastActive))} ago` : 'NEVER'}
+                                            </p>
                                         </td>
                                         <td className="pr-6 py-4 text-right">
                                             {user.status === 'Pending' ? (
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button onClick={() => handleResend(user.id)} className="px-3 py-1.5 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all border border-blue-100 uppercase tracking-widest whitespace-nowrap">Resend</button>
-                                                    <button className="px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all uppercase tracking-widest">Revoke</button>
+                                                    <button onClick={() => handleRevoke(user.id)} className="px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all uppercase tracking-widest">Revoke</button>
                                                 </div>
                                             ) : (
-                                                <button className="p-2 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all">
-                                                    <EllipsisVerticalIcon className="h-5 w-5" />
-                                                </button>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {user.status === 'DEACTIVATED' ? (
+                                                        <button
+                                                            onClick={() => { setUserToReactivate(user); setIsReactivateModalOpen(true); }}
+                                                            className="px-3 py-1.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all border border-emerald-100 uppercase tracking-widest"
+                                                        >
+                                                            Reactivate
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1">
+                                                            {/* Only show actions if current user is hierarchical superior and NOT targeting themselves */}
+                                                            {currentUser && currentUser.id !== user.id && (currentUser.role.level === 0 || (user.role?.level !== undefined && currentUser.role.level < user.role.level)) ? (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleDeactivate(user)}
+                                                                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all group/action"
+                                                                        title="Deactivate Account"
+                                                                    >
+                                                                        <XMarkIcon className="h-5 w-5" />
+                                                                    </button>
+                                                                    <button className="p-2 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all">
+                                                                        <EllipsisVerticalIcon className="h-5 w-5" />
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <span className="p-2 text-slate-300">
+                                                                    <ShieldCheckIcon className="h-5 w-5 opacity-40" />
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </td>
                                     </tr>

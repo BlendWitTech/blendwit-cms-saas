@@ -19,29 +19,34 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/lib/api';
 import { useSettings } from '@/context/SettingsContext';
+import { usePermissions } from '@/context/PermissionsContext';
+import { getVisibleNavItems, checkPermission } from '@/lib/permissions';
 
 const initialNavigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon }, // No permission required
     {
         name: 'Site Pages',
         icon: DocumentTextIcon,
-        id: 'site-pages', // Add ID to easily find it
+        id: 'site-pages',
+        requiredPermission: ['content_view', 'content_edit'],
         children: [
             {
                 name: 'Static Pages',
+                requiredPermission: ['content_view', 'content_edit'],
                 children: [
-                    { name: 'Home', href: '/dashboard/pages/home' },
-                    { name: 'About', href: '/dashboard/pages/about' },
-                    { name: 'Contact', href: '/dashboard/pages/contact' }
+                    { name: 'Home', href: '/dashboard/pages/home', requiredPermission: ['content_view', 'content_edit'] },
+                    { name: 'About', href: '/dashboard/pages/about', requiredPermission: ['content_view', 'content_edit'] },
+                    { name: 'Contact', href: '/dashboard/pages/contact', requiredPermission: ['content_view', 'content_edit'] }
                 ]
             },
             {
                 name: 'Dynamic Pages',
+                requiredPermission: ['content_view', 'content_edit'],
                 children: [
-                    { name: 'Blog List', href: '/dashboard/pages/blog-list' },
-                    { name: 'Blog Details', href: '/dashboard/pages/blog-details' },
-                    { name: 'Project List', href: '/dashboard/pages/project-list' },
-                    { name: 'Project Details', href: '/dashboard/pages/project-details' }
+                    { name: 'Blog List', href: '/dashboard/pages/blog-list', requiredPermission: ['content_view', 'content_edit'] },
+                    { name: 'Blog Details', href: '/dashboard/pages/blog-details', requiredPermission: ['content_view', 'content_edit'] },
+                    { name: 'Project List', href: '/dashboard/pages/project-list', requiredPermission: ['content_view', 'content_edit'] },
+                    { name: 'Project Details', href: '/dashboard/pages/project-details', requiredPermission: ['content_view', 'content_edit'] }
                 ]
             }
         ]
@@ -49,36 +54,39 @@ const initialNavigation = [
     {
         name: 'Content',
         icon: DocumentTextIcon,
+        requiredPermission: ['content_view', 'content_create', 'content_edit'],
         children: [
-            { name: 'Menus', href: '/dashboard/menus', icon: Bars3Icon },
-            { name: 'Projects', href: '/dashboard/projects' },
-            { name: 'Services', href: '/dashboard/services' },
-            { name: 'Team', href: '/dashboard/team' },
-            { name: 'Timeline', href: '/dashboard/timeline' },
-            { name: 'Testimonials', href: '/dashboard/testimonials' },
-            { name: 'Blog Posts', href: '/dashboard/blog' },
-            { name: 'Categories', href: '/dashboard/categories' },
+            { name: 'Menus', href: '/dashboard/menus', icon: Bars3Icon, requiredPermission: 'content_edit' },
+            { name: 'Projects', href: '/dashboard/projects', requiredPermission: ['content_view', 'content_create'] },
+            { name: 'Services', href: '/dashboard/services', requiredPermission: ['content_view', 'content_create'] },
+            { name: 'Team', href: '/dashboard/team', requiredPermission: ['content_view', 'content_create'] },
+            { name: 'Timeline', href: '/dashboard/timeline', requiredPermission: ['content_view', 'content_create'] },
+            { name: 'Testimonials', href: '/dashboard/testimonials', requiredPermission: ['content_view', 'content_create'] },
+            { name: 'Blog Posts', href: '/dashboard/blog', requiredPermission: ['content_view', 'content_create'] },
+            { name: 'Categories', href: '/dashboard/categories', requiredPermission: ['content_view', 'content_create'] },
         ]
     },
-    { name: 'Media', href: '/dashboard/media', icon: PhotoIcon },
+    { name: 'Media', href: '/dashboard/media', icon: PhotoIcon, requiredPermission: 'media_view' },
     {
         name: 'User Management',
         icon: UserGroupIcon,
+        requiredPermission: ['users_view', 'roles_view'],
         children: [
-            { name: 'All Users', href: '/dashboard/users' },
-            { name: 'Roles & Permissions', href: '/dashboard/roles' },
+            { name: 'All Users', href: '/dashboard/users', requiredPermission: 'users_view' },
+            { name: 'Roles & Permissions', href: '/dashboard/roles', requiredPermission: 'roles_view' },
         ]
     },
     {
         name: 'SEO & Analytics',
         icon: ChartBarIcon,
+        requiredPermission: ['analytics_view', 'seo_manage'],
         children: [
-            { name: 'Analytics', href: '/dashboard/analytics' },
-            { name: 'SEO Manager', href: '/dashboard/seo' },
+            { name: 'Analytics', href: '/dashboard/analytics', requiredPermission: 'analytics_view' },
+            { name: 'SEO Manager', href: '/dashboard/seo', requiredPermission: 'seo_manage' },
         ]
     },
-    { name: 'Themes', href: '/dashboard/themes', icon: SwatchIcon },
-    { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon },
+    { name: 'Themes', href: '/dashboard/themes', icon: SwatchIcon, requiredPermission: 'settings_edit' },
+    { name: 'Settings', href: '/dashboard/settings', icon: Cog6ToothIcon, requiredPermission: 'settings_edit' },
 ];
 
 function classNames(...classes: string[]) {
@@ -240,7 +248,16 @@ interface SidebarProps {
 
 export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
     const pathname = usePathname();
+    const { permissions, isLoading: permissionsLoading } = usePermissions();
     const [navItems, setNavItems] = useState(initialNavigation);
+
+    // Filter navigation based on permissions
+    useEffect(() => {
+        if (!permissionsLoading && permissions) {
+            const filtered = getVisibleNavItems(initialNavigation, permissions);
+            setNavItems(filtered);
+        }
+    }, [permissions, permissionsLoading]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -253,8 +270,10 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
     }, [onToggle]);
 
     useEffect(() => {
-        checkThemeStatus();
-    }, []);
+        if (!permissionsLoading && permissions && checkPermission(permissions, 'content_view')) {
+            checkThemeStatus();
+        }
+    }, [permissions, permissionsLoading]);
 
     const checkThemeStatus = async () => {
         try {

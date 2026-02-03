@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
+import { apiRequest } from '@/lib/api';
 import {
     XMarkIcon,
     EnvelopeIcon,
@@ -17,19 +18,49 @@ interface InviteUserModalProps {
 
 export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUserModalProps) {
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState('Editor');
+    const [roleId, setRoleId] = useState('');
     const [ips, setIps] = useState<string[]>([]);
     const [currentIp, setCurrentIp] = useState('');
     const [sendEmail, setSendEmail] = useState(true);
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
 
     const [roles, setRoles] = useState<any[]>([]);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
-    React.useEffect(() => {
-        if (!isOpen) {
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [rolesData, userData] = await Promise.all([
+                    apiRequest('/roles'),
+                    apiRequest('/users/profile')
+                ]);
+
+                setCurrentUser(userData);
+
+                // Filter roles based on hierarchy
+                // Level 0 (Super Admin) can invite to any role EXCEPT Super Admin (handled by backend too)
+                // Others can only invite to roles with level > their own
+                const filteredRoles = Array.isArray(rolesData) ? rolesData.filter((r: any) => {
+                    if (userData.role.level === 0) {
+                        return r.level !== 0; // Don't allow creating more Super Admins via modal
+                    }
+                    return r.level > userData.role.level;
+                }) : [];
+
+                setRoles(filteredRoles);
+                if (filteredRoles.length > 0) {
+                    setRoleId(filteredRoles[0].id);
+                }
+            } catch (error) {
+                console.error('Failed to fetch invitation data:', error);
+            }
+        };
+
+        if (isOpen) {
+            fetchData();
+        } else {
             // Reset state on close
             setEmail('');
-            setRole('Editor');
             setIps([]);
             setCurrentIp('');
             setSendEmail(true);
@@ -37,29 +68,11 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
         }
     }, [isOpen]);
 
-    React.useEffect(() => {
-        const fetchRoles = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-            try {
-                const response = await fetch('http://localhost:3001/roles', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setRoles(Array.isArray(data) ? data : []);
-                }
-            } catch (error) {
-                console.error('Failed to fetch roles:', error);
-            }
-        };
-        fetchRoles();
-    }, []);
-
     if (!isOpen) return null;
 
     const isDirty = () => {
-        return email.trim() !== '' || role !== 'Editor' || ips.length > 0 || currentIp.trim() !== '' || !sendEmail;
+        const defaultRoleId = roles.length > 0 ? roles[0].id : '';
+        return email.trim() !== '' || roleId !== defaultRoleId || ips.length > 0 || currentIp.trim() !== '' || !sendEmail;
     };
 
     const handleCloseAttempt = () => {
@@ -83,7 +96,7 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onInvite({ email, role, ips, sendEmail });
+        onInvite({ email, role: roleId, ips, sendEmail });
     };
 
     return (
@@ -92,7 +105,7 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
                 isOpen={showUnsavedAlert}
                 onSaveAndExit={() => {
                     // Since invite is an action, Save & Exit conceptually means "Send Invite"
-                    onInvite({ email, role, ips, sendEmail });
+                    onInvite({ email, role: roleId, ips, sendEmail });
                     // setShowUnsavedAlert(false); // implicit in onClose/onInvite via parent? No usually we close modal
                     // Wait, onInvite usually closes modal or parent does?
                     // UsersPage: onInvite calls API then closes/refreshes.
@@ -142,8 +155,8 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
                                 <button
                                     key={r.id}
                                     type="button"
-                                    onClick={() => setRole(r.name)}
-                                    className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${role === r.name
+                                    onClick={() => setRoleId(r.id)}
+                                    className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${roleId === r.id
                                         ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200'
                                         : 'text-slate-500 hover:text-slate-900'
                                         }`}

@@ -16,18 +16,116 @@ import {
     LockClosedIcon,
     ExclamationTriangleIcon,
     CheckCircleIcon,
-    InformationCircleIcon
+    InformationCircleIcon,
+    EyeIcon,
+    XMarkIcon,
+    ClockIcon
 } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/lib/api';
 import Alert from '@/components/ui/Alert';
+import { formatDistanceToNow } from 'date-fns';
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ');
 }
 
+const humanizeAction = (action: string, metadata: any) => {
+    const actionMap: Record<string, string> = {
+        'LOGIN_SUCCESS': 'successfully logged into your account',
+        'LOGIN_FAILED': 'attempted to log in but failed',
+        'USER_UPDATE_PROFILE': 'updated your profile information',
+        'PASSWORD_CHANGE': 'changed your account password',
+        'TWO_FACTOR_ENABLED': 'enabled two-factor authentication',
+        'TWO_FACTOR_DISABLED': 'disabled two-factor authentication',
+        'SESSION_REVOKED': 'revoked an active session',
+        'EMAIL_CHANGED': 'changed your email address',
+        'ROLE_CHANGED': 'had their role modified by an administrator'
+    };
+
+    let desc = actionMap[action] || action.toLowerCase().replace(/_/g, ' ');
+
+    // Add IP context if available
+    if (metadata?.ip && metadata.ip !== 'unknown') {
+        desc += ` from IP ${metadata.ip}`;
+    }
+
+    return desc;
+};
+
+const AuditDetailModal = ({ isOpen, onClose, log }: { isOpen: boolean, onClose: () => void, log: any | null }) => {
+    if (!log) return null;
+
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl ring-1 ring-slate-900/5 transition-all">
+                <div className="p-8">
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                <InformationCircleIcon className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Security Event</p>
+                                <h3 className="text-xl font-bold text-slate-900">{log.action.replace(/_/g, ' ')}</h3>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 rounded-xl transition-all">
+                            <XMarkIcon className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Description</p>
+                            <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                                You {humanizeAction(log.action, log.metadata)}.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Timestamp</p>
+                                <p className="text-sm font-bold text-slate-900">{new Date(log.createdAt).toLocaleDateString()}</p>
+                                <p className="text-[10px] font-medium text-slate-500">{new Date(log.createdAt).toLocaleTimeString()}</p>
+                            </div>
+                            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Status</p>
+                                <p className={`text-sm font-bold ${log.status === 'DANGER' ? 'text-red-600' :
+                                    log.status === 'WARNING' ? 'text-amber-600' :
+                                        'text-emerald-600'
+                                    }`}>{log.status}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 ml-1">Event Metadata</p>
+                            <div className="bg-slate-900 rounded-3xl p-6 overflow-x-auto">
+                                <pre className="text-[11px] font-mono text-blue-400 leading-relaxed">
+                                    {JSON.stringify(log.metadata, null, 4)}
+                                </pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-8">
+                        <button
+                            onClick={onClose}
+                            className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95"
+                        >
+                            Close Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function ProfilePage() {
     const [user, setUser] = useState<any>(null);
     const [logs, setLogs] = useState<any[]>([]);
+    const [selectedLog, setSelectedLog] = useState<any | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('general');
     const [is2FAModalOpen, setIs2FAModalOpen] = useState(false);
@@ -330,19 +428,29 @@ export default function ProfilePage() {
                                                     <Icon className="h-6 w-6" />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="flex items-center justify-between">
+                                                    <div className="flex items-center justify-between mb-2">
                                                         <p className="text-sm font-bold text-slate-900">{log.action.replace(/_/g, ' ')}</p>
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-lg">
-                                                            {new Date(log.createdAt).toLocaleDateString()}
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-lg ring-1 ring-slate-100">
+                                                            {formatDistanceToNow(new Date(log.createdAt))} ago
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        {log.status === 'DANGER' && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />}
-                                                        <p className="text-xs font-medium text-slate-500">
-                                                            {new Date(log.createdAt).toLocaleTimeString()}
-                                                            {log.metadata?.attempts ? ` • ${log.metadata.attempts} Failed Attempts` : ''}
-                                                            {log.metadata?.ip ? ` • IP: ${log.metadata.ip}` : ''}
-                                                        </p>
+                                                    <p className="text-xs font-medium text-slate-600 leading-relaxed mb-2">
+                                                        You {humanizeAction(log.action, log.metadata)}.
+                                                    </p>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            {log.status === 'DANGER' && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />}
+                                                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                                                                ID: {log.id.split('-')[0]}
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => setSelectedLog(log)}
+                                                            className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest transition-colors"
+                                                        >
+                                                            <EyeIcon className="h-3.5 w-3.5" />
+                                                            Details
+                                                        </button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -350,6 +458,12 @@ export default function ProfilePage() {
                                     })
                                 )}
                             </div>
+
+                            <AuditDetailModal
+                                isOpen={!!selectedLog}
+                                onClose={() => setSelectedLog(null)}
+                                log={selectedLog}
+                            />
                         </div>
                     )}
                 </div>

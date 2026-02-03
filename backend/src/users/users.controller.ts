@@ -1,28 +1,33 @@
-import { Controller, Get, Param, Delete, Query, UseGuards, Patch, Request, Body } from '@nestjs/common';
+import { Controller, Get, Param, Delete, Query, UseGuards, Patch, Request, Body, Post, ForbiddenException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { IpGuard } from '../auth/ip.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { AccessControlService } from '../auth/access-control.service';
 
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
-@UseGuards(JwtAuthGuard, IpGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, IpGuard, RolesGuard, PermissionsGuard)
 @Controller('users')
 export class UsersController {
     constructor(
         private readonly usersService: UsersService,
-        private readonly auditLog: AuditLogService
+        private readonly auditLog: AuditLogService,
+        private readonly accessControl: AccessControlService,
     ) { }
 
     @Get('stats')
-    @Roles('Super Admin', 'Admin')
+    @RequirePermissions(Permission.USERS_VIEW)
     async getStats() {
         return this.usersService.getStats();
     }
 
     @Get()
-    @Roles('Super Admin', 'Admin')
+    @RequirePermissions(Permission.USERS_VIEW)
     async findAll(
         @Query('search') search?: string,
         @Query('role') role?: string,
@@ -68,6 +73,10 @@ export class UsersController {
         if (!email) throw new Error('Unauthorized');
         const user = await this.usersService.findOne(email);
         if (!user) throw new Error('User not found');
+
+        // Update lastActive timestamp
+        await this.usersService.updateLastActive(user.id);
+
         return user;
     }
 
@@ -103,14 +112,57 @@ export class UsersController {
     }
 
     @Delete(':id')
-    @Roles('Super Admin')
+    @RequirePermissions(Permission.USERS_DELETE)
     async remove(@Param('id') id: string, @Request() req) {
-        // Since delete users endpoint might be used by admins, we should log who deleted whom.
-        // Assuming request has user info from JwtAuthGuard
+        await this.accessControl.validateHierarchy(req.user.userId, id);
         const res = await this.usersService.remove(id);
-        const adminId = req.user?.userId || 'unknown'; // Need to ensure request has user. 
-        // Wait, remove doesn't have @Request currently.
-        await this.auditLog.log(adminId, 'USER_DELETE', { targetUserId: id });
+        await this.auditLog.log(req.user.userId, 'USER_DELETE', { targetUserId: id });
+        return res;
+    }
+
+    @Patch(':id/deactivate')
+    @RequirePermissions(Permission.USERS_DEACTIVATE)
+    async deactivate(@Param('id') id: string, @Request() req) {
+        await this.accessControl.validateHierarchy(req.user.userId, id);
+        const target = await this.usersService.findById(id);
+        const res = await this.usersService.deactivate(id);
+        await this.auditLog.log(req.user.userId, 'USER_DEACTIVATE', {
+            targetUserId: id,
+            targetUserName: target?.name || 'Unknown User'
+        });
+        return res;
+    }
+
+    @Patch(':id/reactivate')
+    @RequirePermissions(Permission.USERS_REACTIVATE)
+    async reactivate(@Param('id') id: string, @Body() data: { newEmail?: string }, @Request() req) {
+        await this.accessControl.validateHierarchy(req.user.userId, id);
+
+        // Only Super Admin can change email during reactivation
+        if (data.newEmail) {
+            const actor = await this.usersService.findOne(req.user.email);
+            if (actor?.role.name !== 'Super Admin') {
+                throw new ForbiddenException('Only Super Admin can change email during reactivation.');
+            }
+        }
+
+        const target = await this.usersService.findById(id);
+        const res = await this.usersService.reactivate(id, data.newEmail);
+        await this.auditLog.log(req.user.userId, 'USER_REACTIVATE', {
+            targetUserId: id,
+            targetUserName: target?.name || 'Unknown User',
+            emailChanged: !!data.newEmail
+        });
+        return res;
+    }
+
+    @Post(':id/transfer')
+    @Roles('Super Admin')
+    async transfer(@Param('id') id: string, @Body() data: { targetUserId: string }, @Request() req) {
+        // Transfer logic usually involves moving data from 'id' to 'targetUserId'
+        // This is strictly restricted to Super Admin as per request.
+        const res = await this.usersService.transferData(id, data.targetUserId);
+        await this.auditLog.log(req.user.userId, 'USER_DATA_TRANSFER', { sourceUserId: id, targetUserId: data.targetUserId });
         return res;
     }
 }

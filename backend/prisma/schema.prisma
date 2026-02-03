@@ -25,6 +25,8 @@ model User {
   preferences         Json?
   avatar              String?
   bio                 String?
+  status              String        @default("ACTIVE") // ACTIVE, DEACTIVATED
+  lastActive          DateTime?
   activityLogs        ActivityLog[]
   comments            Comment[]
   posts               Post[]
@@ -56,6 +58,7 @@ model Role {
   id          String   @id @default(uuid())
   name        String   @unique
   permissions Json
+  level       Int      @default(10) // 0: Super Admin, 1: Admin, 10+: Others
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   icon        String?

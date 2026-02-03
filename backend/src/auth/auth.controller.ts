@@ -1,4 +1,4 @@
-import { Controller, Request, Post, UseGuards, Body, Get } from '@nestjs/common';
+import { Controller, Request, Post, UseGuards, Body, Get, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -85,6 +85,18 @@ export class AuthController {
     @Post('register')
     async register(@Body() userData: any) {
         return this.authService.register(userData);
+    }
+
+    @Post('register-invited')
+    async registerInvited(@Body() data: { token: string; name: string; password: string }) {
+        try {
+            return await this.authService.registerWithInvitation(data.token, {
+                name: data.name,
+                password: data.password,
+            });
+        } catch (error: any) {
+            throw new BadRequestException(error.message || 'Registration failed');
+        }
     }
 
     @UseGuards(JwtAuthGuard)

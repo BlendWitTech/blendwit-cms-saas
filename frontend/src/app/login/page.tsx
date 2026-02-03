@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { LockClosedIcon, EnvelopeIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { useNotification } from '@/context/NotificationContext';
 
 const API_URL = 'http://localhost:3001';
 
 export default function LoginPage() {
+    const { showToast } = useNotification();
     // ... (rest of states remain same)
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -37,10 +39,10 @@ export default function LoginPage() {
                 body: JSON.stringify({ email }),
             });
             const data = await res.json();
-            alert(data.message || 'If an account exists, an email has been sent.');
+            showToast(data.message || 'If an account exists, an email has been sent.', 'success');
             setShowForgotPassword(false);
         } catch (error) {
-            alert('Failed to send request');
+            showToast('Failed to send request', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -73,10 +75,10 @@ export default function LoginPage() {
                 localStorage.setItem('token', data.access_token);
                 window.location.href = '/dashboard';
             } else {
-                alert('Invalid 2FA code');
+                showToast(data.message || 'Invalid 2FA code', 'error');
             }
         } catch (error) {
-            alert('Verification failed');
+            showToast('Verification failed', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -108,10 +110,10 @@ export default function LoginPage() {
                     window.location.href = '/dashboard';
                 }
             } else {
-                alert('Login failed: Invalid credentials');
+                showToast(data.message || 'Login failed: Invalid credentials', 'error');
             }
         } catch (error) {
-            alert('Login failed: Server unreachable');
+            showToast('Login failed: Server unreachable', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -120,7 +122,7 @@ export default function LoginPage() {
     const handleChangePassword = async (e: React.FormEvent) => {
         e.preventDefault();
         if (newPassword !== confirmPassword) {
-            alert('Passwords do not match');
+            showToast('Passwords do not match', 'error');
             return;
         }
         setIsLoading(true);
@@ -137,10 +139,11 @@ export default function LoginPage() {
                 localStorage.setItem('token', token);
                 window.location.href = '/dashboard';
             } else {
-                alert('Failed to change password');
+                const err = await res.json();
+                showToast(err.message || 'Failed to change password', 'error');
             }
         } catch (error) {
-            alert('Error changing password');
+            showToast('Error changing password', 'error');
         } finally {
             setIsLoading(false);
         }

@@ -25,7 +25,11 @@ export class AuditLogService {
             take: limit,
             include: {
                 user: {
-                    select: { name: true, email: true, role: true }
+                    select: {
+                        name: true,
+                        email: true,
+                        role: { select: { name: true } }
+                    }
                 }
             }
         });

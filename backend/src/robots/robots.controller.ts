@@ -2,6 +2,9 @@ import { Controller, Get, Post, Body, Header, UseGuards, Request } from '@nestjs
 import { RobotsService } from './robots.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
 @Controller()
 export class RobotsController {
@@ -17,13 +20,15 @@ export class RobotsController {
     }
 
     @Get('api/robots')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.SEO_MANAGE)
     async getConfig() {
         return this.robotsService.getConfig();
     }
 
     @Post('api/robots')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.SEO_MANAGE)
     async updateRobotsTxt(@Body() data: { content: string }, @Request() req) {
         const result = await this.robotsService.updateRobotsTxt(data.content);
         await this.auditLog.log(req.user.userId, 'ROBOTS_TXT_UPDATE', {});

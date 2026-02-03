@@ -3,9 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-    PlusIcon,
     PencilSquareIcon,
-    TrashIcon,
     Bars3Icon,
     LinkIcon
 } from '@heroicons/react/24/outline';
@@ -33,16 +31,7 @@ export default function MenusManagement() {
         }
     };
 
-    const deleteMenu = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this menu? Standard navigation might break.')) return;
-        try {
-            await apiRequest(`/menus/${id}`, { method: 'DELETE' });
-            showToast('Menu deleted successfully', 'success');
-            setMenus(menus.filter(m => m.id !== id));
-        } catch (error: any) {
-            showToast(error.message || 'Failed to delete menu', 'error');
-        }
-    };
+
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
@@ -50,15 +39,12 @@ export default function MenusManagement() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
                 <div>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Navigation <span className="text-blue-600">Menus</span></h1>
-                    <p className="text-slate-500 font-medium mt-1">Manage header, footer, and custom navigation structures.</p>
+                    <p className="text-slate-500 font-medium mt-1">Menus are automatically extracted from your theme. Edit names and URLs as needed.</p>
                 </div>
-                <Link
-                    href="/dashboard/menus/new"
-                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-blue-600/20 hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all leading-none"
-                >
-                    <PlusIcon className="h-4 w-4" strokeWidth={3} />
-                    Create New Menu
-                </Link>
+                <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2.5 rounded-2xl border border-blue-200">
+                    <Bars3Icon className="h-4 w-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Auto-Synced</span>
+                </div>
             </div>
 
             {/* Menus List */}
@@ -110,18 +96,12 @@ export default function MenusManagement() {
                                             <div className="flex items-center justify-end gap-2">
                                                 <Link
                                                     href={`/dashboard/menus/${menu.id}`}
-                                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                                                    title="Edit Menu"
+                                                    className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all font-bold text-xs uppercase tracking-wider"
+                                                    title="Edit Menu Items"
                                                 >
-                                                    <PencilSquareIcon className="h-5 w-5" />
+                                                    <PencilSquareIcon className="h-4 w-4" />
+                                                    Edit Items
                                                 </Link>
-                                                <button
-                                                    onClick={() => deleteMenu(menu.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                                    title="Delete Menu"
-                                                >
-                                                    <TrashIcon className="h-5 w-5" />
-                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -134,15 +114,15 @@ export default function MenusManagement() {
                         <div className="w-20 h-20 bg-slate-100 rounded-[2.5rem] flex items-center justify-center text-slate-300 mb-6">
                             <Bars3Icon className="h-10 w-10" />
                         </div>
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">No Menus Defined</h3>
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight">No Menus Found</h3>
                         <p className="text-slate-500 font-medium mt-2 max-w-sm">
-                            Create your first menu to manage your website's navigation links.
+                            Menus will be automatically extracted when you upload a theme. Upload a theme to get started.
                         </p>
                         <Link
-                            href="/dashboard/menus/new"
-                            className="mt-8 inline-flex items-center gap-2 text-blue-600 font-black uppercase text-xs tracking-widest hover:gap-4 transition-all"
+                            href="/dashboard/themes"
+                            className="mt-8 inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all"
                         >
-                            Create First Menu <PlusIcon className="h-4 w-4" />
+                            Go to Themes
                         </Link>
                     </div>
                 )}

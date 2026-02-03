@@ -27,6 +27,16 @@ export async function apiRequest(endpoint: string, options: RequestOptions = {})
 
         if (!response.ok) {
             const errorMessage = data.message || 'An unexpected error occurred';
+
+            // Check for revoked access and trigger immediate boot-out
+            if (errorMessage === 'Your access has been revoked. Please contact an administrator.') {
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('session-revoked', {
+                        detail: { message: errorMessage }
+                    }));
+                }
+            }
+
             if (!skipNotification && typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('api-notification', {
                     detail: { message: errorMessage, type: 'error' }

@@ -17,6 +17,7 @@ import {
     CalendarIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import PostEditor from '@/components/blog/PostEditor';
 import MediaLibrary from '@/components/media/MediaLibrary';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
@@ -60,6 +61,16 @@ export default function BlogPage() {
     useEffect(() => {
         fetchInitialData();
     }, []);
+
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        if (searchParams.get('action') === 'new' && !isLoading) {
+            handleCreate();
+            router.replace('/dashboard/blog', { scroll: false });
+        }
+    }, [searchParams, isLoading]);
 
     const fetchInitialData = async () => {
         const token = localStorage.getItem('token');

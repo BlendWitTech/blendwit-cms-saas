@@ -6,7 +6,11 @@ import { IpGuard } from '../auth/ip.guard';
 import { UsersService } from '../users/users.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 
-@UseGuards(JwtAuthGuard, IpGuard)
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
+
+@UseGuards(JwtAuthGuard, IpGuard, PermissionsGuard)
 @Controller('blogs')
 export class BlogsController {
     constructor(
@@ -16,6 +20,7 @@ export class BlogsController {
     ) { }
 
     @Post()
+    @RequirePermissions(Permission.CONTENT_CREATE)
     async create(@Request() req, @Body() createPostDto: CreatePostDto) {
         const user = await this.usersService.findOne(req.user.email);
         if (!user) throw new Error('User not found');
@@ -33,6 +38,7 @@ export class BlogsController {
     }
 
     @Get()
+    @RequirePermissions(Permission.CONTENT_VIEW)
     findAll(
         @Query('status') status?: string,
         @Query('category') category?: string,
@@ -42,11 +48,13 @@ export class BlogsController {
     }
 
     @Get(':slug')
+    @RequirePermissions(Permission.CONTENT_VIEW)
     findOne(@Param('slug') slug: string) {
         return this.blogsService.findOne(slug);
     }
 
     @Patch(':id')
+    @RequirePermissions(Permission.CONTENT_EDIT)
     async update(@Request() req, @Param('id') id: string, @Body() updatePostDto: Partial<CreatePostDto>) {
         const user = await this.usersService.findOne(req.user.email);
         const post = await this.blogsService.findById(id);
@@ -71,6 +79,7 @@ export class BlogsController {
     }
 
     @Delete(':id')
+    @RequirePermissions(Permission.CONTENT_DELETE)
     async remove(@Request() req, @Param('id') id: string) {
         const user = await this.usersService.findOne(req.user.email);
         const post = await this.blogsService.findById(id);

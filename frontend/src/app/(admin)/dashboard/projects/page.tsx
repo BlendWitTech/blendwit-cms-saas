@@ -16,8 +16,11 @@ import MediaLibrary from '@/components/media/MediaLibrary';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 import { useNotification } from '@/context/NotificationContext';
 import { apiRequest } from '@/lib/api';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function ProjectsPage() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
     const [view, setView] = useState<'list' | 'editor'>('list');
     const [projects, setProjects] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
@@ -56,6 +59,15 @@ export default function ProjectsPage() {
     useEffect(() => {
         fetchInitialData();
     }, []);
+
+    useEffect(() => {
+        // Auto-open create mode if query param exists
+        if (searchParams.get('action') === 'new' && !isLoading) {
+            handleCreate();
+            // Clear param without refresh
+            router.replace('/dashboard/projects', { scroll: false });
+        }
+    }, [searchParams, isLoading]);
 
     const fetchInitialData = async () => {
         try {

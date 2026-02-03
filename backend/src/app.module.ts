@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { AccessControlModule } from './auth/access-control.module';
 import { UsersModule } from './users/users.module';
 import { SettingsModule } from './settings/settings.module';
 import { InvitationsModule } from './invitations/invitations.module';
@@ -36,6 +37,7 @@ import { ThemesModule } from './themes/themes.module';
   imports: [
     PrismaModule,
     UsersModule,
+    AccessControlModule,
     AuthModule,
     RolesModule,
     SettingsModule,

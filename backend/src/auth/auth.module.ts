@@ -8,6 +8,7 @@ import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
 
 import { SecurityService } from './security.service';
+import { AccessControlService } from './access-control.service';
 
 @Module({
   imports: [

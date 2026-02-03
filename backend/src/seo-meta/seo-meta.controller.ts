@@ -2,9 +2,12 @@ import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request } from '
 import { SeoMetaService } from './seo-meta.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
 @Controller('seo-meta')
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard) - Removed global guard to verify per-endpoint
 export class SeoMetaController {
     constructor(
         private readonly seoMetaService: SeoMetaService,
@@ -24,7 +27,8 @@ export class SeoMetaController {
         return this.seoMetaService.findByPage(pageType, pageId);
     }
 
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.SEO_MANAGE)
     @Post()
     async upsert(@Body() data: any, @Request() req) {
         const result = await this.seoMetaService.upsert(data);
@@ -36,6 +40,8 @@ export class SeoMetaController {
         return result;
     }
 
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.SEO_MANAGE)
     @Delete(':id')
     async delete(@Param('id') id: string, @Request() req) {
         const result = await this.seoMetaService.delete(id);
@@ -43,6 +49,8 @@ export class SeoMetaController {
         return result;
     }
 
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.SEO_MANAGE)
     @Post('analyze')
     async analyze(@Body() data: { content: string; meta: any }) {
         return this.seoMetaService.analyzeSeo(data.content, data.meta);

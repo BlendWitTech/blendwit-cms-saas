@@ -32,7 +32,10 @@ import {
     BuildingOfficeIcon,
     CreditCardIcon,
     ArrowLeftIcon,
-    CheckIcon
+    CheckIcon,
+    PlusIcon,
+    TrashIcon,
+    LockClosedIcon
 } from '@heroicons/react/24/outline';
 
 interface RoleFormProps {
@@ -46,25 +49,67 @@ interface RoleFormProps {
 export default function RoleForm({ initialData, onSave, isLoading: externalLoading, title, subtitle }: RoleFormProps) {
     const router = useRouter();
     const [name, setName] = useState('');
+    const [level, setLevel] = useState(10);
     const [permissions, setPermissions] = useState({
-        manage_content: false,
-        manage_media: false,
-        manage_users: false,
-        manage_settings: false,
+        users_view: false,
+        users_create: false,
+        users_edit: false,
+        users_delete: false,
+        users_deactivate: false,
+        users_reactivate: false,
+        roles_view: false,
+        roles_create: false,
+        roles_edit: false,
+        roles_delete: false,
+        content_view: false,
+        content_create: false,
+        content_edit: false,
+        content_delete: false,
+        media_view: false,
+        media_upload: false,
+        media_delete: false,
+        settings_edit: false,
+        audit_view: false,
+        themes_manage: false,
+        menus_manage: false,
+        analytics_view: false,
+        seo_manage: false,
+        leads_view: false,
+        leads_manage: false,
+        all: false,
     });
     const [icon, setIcon] = useState('ShieldCheckIcon');
     const [isSaving, setIsSaving] = useState(false);
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
 
     // Capture initial state for comparison
-    const [initialState, setInitialState] = useState<{ name: string, icon: string, permissions: any }>({
+    const [initialState, setInitialState] = useState<{ name: string, icon: string, level: number, permissions: any }>({
         name: '',
         icon: 'ShieldCheckIcon',
+        level: 10,
         permissions: {
-            manage_content: false,
-            manage_media: false,
-            manage_users: false,
-            manage_settings: false,
+            users_view: false,
+            users_create: false,
+            users_edit: false,
+            users_delete: false,
+            users_deactivate: false,
+            users_reactivate: false,
+            roles_view: false,
+            roles_create: false,
+            roles_edit: false,
+            roles_delete: false,
+            content_view: false,
+            content_create: false,
+            content_edit: false,
+            content_delete: false,
+            media_view: false,
+            media_upload: false,
+            media_delete: false,
+            settings_edit: false,
+            audit_view: false,
+            analytics_view: false,
+            seo_manage: false,
+            all: false,
         }
     });
 
@@ -72,35 +117,54 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
         if (initialData) {
             const loadedName = initialData.name || '';
             const loadedIcon = initialData.icon || 'ShieldCheckIcon';
+            const loadedLevel = initialData.level ?? 10;
             let loadedPermissions;
 
             if (initialData.name === 'Super Admin') {
-                loadedPermissions = {
-                    manage_content: true,
-                    manage_media: true,
-                    manage_users: true,
-                    manage_settings: true,
-                };
+                loadedPermissions = Object.keys(permissions).reduce((acc, key) => ({ ...acc, [key]: true }), {});
             } else {
                 loadedPermissions = {
-                    manage_content: initialData.permissions?.manage_content || false,
-                    manage_media: initialData.permissions?.manage_media || false,
-                    manage_users: initialData.permissions?.manage_users || false,
-                    manage_settings: initialData.permissions?.manage_settings || false,
+                    users_view: initialData.permissions?.users_view || initialData.permissions?.manage_users || false,
+                    users_create: initialData.permissions?.users_create || initialData.permissions?.manage_users || false,
+                    users_edit: initialData.permissions?.users_edit || initialData.permissions?.manage_users || false,
+                    users_delete: initialData.permissions?.users_delete || initialData.permissions?.manage_users || false,
+                    users_deactivate: initialData.permissions?.users_deactivate || initialData.permissions?.manage_users || false,
+                    users_reactivate: initialData.permissions?.users_reactivate || initialData.permissions?.manage_users || false,
+                    roles_view: initialData.permissions?.roles_view || initialData.permissions?.manage_users || false,
+                    roles_create: initialData.permissions?.roles_create || initialData.permissions?.manage_users || false,
+                    roles_edit: initialData.permissions?.roles_edit || initialData.permissions?.manage_users || false,
+                    roles_delete: initialData.permissions?.roles_delete || initialData.permissions?.manage_users || false,
+                    content_view: initialData.permissions?.content_view || initialData.permissions?.manage_content || false,
+                    content_create: initialData.permissions?.content_create || initialData.permissions?.manage_content || false,
+                    content_edit: initialData.permissions?.content_edit || initialData.permissions?.manage_content || false,
+                    content_delete: initialData.permissions?.content_delete || initialData.permissions?.manage_content || false,
+                    media_view: initialData.permissions?.media_view || initialData.permissions?.manage_media || false,
+                    media_upload: initialData.permissions?.media_upload || initialData.permissions?.manage_media || false,
+                    media_delete: initialData.permissions?.media_delete || initialData.permissions?.manage_media || false,
+                    settings_edit: initialData.permissions?.settings_edit || initialData.permissions?.manage_settings || false,
+                    audit_view: initialData.permissions?.audit_view || initialData.permissions?.manage_settings || false,
+                    themes_manage: initialData.permissions?.themes_manage || initialData.permissions?.manage_settings || false,
+                    menus_manage: initialData.permissions?.menus_manage || initialData.permissions?.manage_settings || false,
+                    analytics_view: initialData.permissions?.analytics_view || initialData.permissions?.manage_settings || false,
+                    seo_manage: initialData.permissions?.seo_manage || initialData.permissions?.manage_settings || false,
+                    leads_view: initialData.permissions?.leads_view || initialData.permissions?.manage_marketing || false,
+                    leads_manage: initialData.permissions?.leads_manage || initialData.permissions?.manage_marketing || false,
+                    all: initialData.permissions?.all || false,
                 };
             }
 
             setName(loadedName);
             setIcon(loadedIcon);
-            setPermissions(loadedPermissions);
-            setInitialState({ name: loadedName, icon: loadedIcon, permissions: loadedPermissions });
+            setLevel(loadedLevel);
+            setPermissions(loadedPermissions as any);
+            setInitialState({ name: loadedName, icon: loadedIcon, level: loadedLevel, permissions: loadedPermissions });
         }
     }, [initialData]);
 
     const isDirty = () => {
         const currentPermissions = JSON.stringify(permissions);
         const initialPermissions = JSON.stringify(initialState.permissions);
-        return name !== initialState.name || icon !== initialState.icon || currentPermissions !== initialPermissions;
+        return name !== initialState.name || icon !== initialState.icon || level !== initialState.level || currentPermissions !== initialPermissions;
     };
 
     const handleCancelClick = () => {
@@ -114,7 +178,7 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
     const saveChanges = async () => {
         setIsSaving(true);
         try {
-            await onSave({ name, icon, ...permissions });
+            await onSave({ name, icon, level, ...permissions });
         } catch (error) {
             console.error(error);
         } finally {
@@ -128,14 +192,69 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
     };
 
     const togglePermission = (key: keyof typeof permissions) => {
+        // Prevent toggling permissions for Super Admin
+        if (name === 'Super Admin' || initialData?.name === 'Super Admin') {
+            return;
+        }
         setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
-    const permissionConfig = [
-        { key: 'manage_content', label: 'Content Management', icon: DocumentTextIcon, desc: 'Create, edit, and publish blog posts, pages, and other content types.' },
-        { key: 'manage_media', label: 'Media Library', icon: PhotoIcon, desc: 'Upload, organize, and manage images, videos, and documents.' },
-        { key: 'manage_users', label: 'User Management', icon: UsersIcon, desc: 'Invite new users, manage roles, and configure access levels.' },
-        { key: 'manage_settings', label: 'System Settings', icon: Cog6ToothIcon, desc: 'Configure global settings, integrations, and system preferences.' },
+    const permissionSections = [
+        {
+            title: 'User Management',
+            desc: 'Control who can access the CMS and what they can do.',
+            permissions: [
+                { key: 'users_view', label: 'View Users', icon: UsersIcon, desc: 'View the list of users and their profiles.' },
+                { key: 'users_create', label: 'Invite Users', icon: PlusIcon, desc: 'Invite new team members.' },
+                { key: 'users_edit', label: 'Edit Users', icon: PencilSquareIcon, desc: 'Modify user details and roles (subject to hierarchy).' },
+                { key: 'users_delete', label: 'Delete Users', icon: TrashIcon, desc: 'Permenantly remove users.' },
+                { key: 'users_deactivate', label: 'Deactivate Users', icon: XMarkIcon, desc: 'Temporarily block access.' },
+                { key: 'users_reactivate', label: 'Reactivate Users', icon: CheckIcon, desc: 'Restore access or transfer accounts.' },
+            ]
+        },
+        {
+            title: 'Role Management',
+            desc: 'Define and manage security levels.',
+            permissions: [
+                { key: 'roles_view', label: 'View Roles', icon: ShieldCheckIcon, desc: 'View existing roles and permissions.' },
+                { key: 'roles_create', label: 'Create Roles', icon: PlusIcon, desc: 'Create new custom roles.' },
+                { key: 'roles_edit', label: 'Edit Roles', icon: PencilSquareIcon, desc: 'Modify role settings and levels.' },
+                { key: 'roles_delete', label: 'Delete Roles', icon: TrashIcon, desc: 'Remove unused roles.' },
+            ]
+        },
+        {
+            title: 'Content & Media',
+            desc: 'Manage the core website data.',
+            permissions: [
+                { key: 'content_view', label: 'View Content', icon: DocumentTextIcon, desc: 'Access blogs and projects.' },
+                { key: 'content_create', label: 'Create Content', icon: PlusIcon, desc: 'Write new blog posts or projects.' },
+                { key: 'content_edit', label: 'Edit Content', icon: PencilSquareIcon, desc: 'Modify existing content.' },
+                { key: 'content_delete', label: 'Delete Content', icon: TrashIcon, desc: 'Remove blogs or projects.' },
+                { key: 'media_view', label: 'View Media', icon: PhotoIcon, desc: 'Access the media library.' },
+                { key: 'media_upload', label: 'Upload Media', icon: RocketLaunchIcon, desc: 'Add new files to the system.' },
+                { key: 'media_delete', label: 'Delete Media', icon: TrashIcon, desc: 'Remove files from storage.' },
+            ]
+        },
+        {
+            title: 'System & Configuration',
+            desc: 'Administrative tools for site management.',
+            permissions: [
+                { key: 'settings_edit', label: 'Edit Settings', icon: Cog6ToothIcon, desc: 'Modify global site and server settings.' },
+                { key: 'audit_view', label: 'View Audit Logs', icon: CommandLineIcon, desc: 'Track all administrative actions.' },
+                { key: 'themes_manage', label: 'Manage Themes', icon: PaintBrushIcon, desc: 'Install and activate website themes.' },
+                { key: 'menus_manage', label: 'Manage Menus', icon: QueueListIcon, desc: 'Configure navigation menus.' },
+            ]
+        },
+        {
+            title: 'Marketing & SEO',
+            desc: 'Tools for growth and visibility.',
+            permissions: [
+                { key: 'analytics_view', label: 'View Analytics', icon: PresentationChartLineIcon, desc: 'Monitor site performance.' },
+                { key: 'seo_manage', label: 'Manage SEO', icon: MagnifyingGlassIcon, desc: 'Configure meta tags, redirects, and robots.txt.' },
+                { key: 'leads_view', label: 'View Leads', icon: UserGroupIcon, desc: 'Access form submissions and leads.' },
+                { key: 'leads_manage', label: 'Manage Leads', icon: BriefcaseIcon, desc: 'Export and delete lead data.' },
+            ]
+        }
     ];
 
     const icons = [
@@ -237,6 +356,46 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
                                 />
                             </div>
 
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-bold text-slate-700">Hierarchy Level</label>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${level === 0 ? 'bg-amber-100 text-amber-700' :
+                                        level === 1 ? 'bg-blue-100 text-blue-700' :
+                                            'bg-slate-100 text-slate-600'
+                                        }`}>
+                                        {level === 0 ? 'Level 0 (God Mode)' :
+                                            level === 1 ? 'Level 1 (Admin)' :
+                                                `Level ${level}`}
+                                    </span>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="relative">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={level}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value);
+                                                if (!isNaN(val) && val >= 0 && val <= 100) setLevel(val);
+                                            }}
+                                            disabled={initialData?.name === 'Super Admin' || initialData?.name === 'Admin'}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm font-bold text-slate-900 focus:outline-none focus:ring-4 focus:ring-blue-600/5 focus:bg-white focus:border-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        />
+                                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                            <span className="text-xs font-bold text-slate-400">0-100</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-tighter px-1">
+                                        <span>Highest Authority (0)</span>
+                                        <span>Lowest Authority (100)</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed italic bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
+                                        Users can only manage others with a **strictly higher** level number than their own.
+                                    </p>
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
                                 <label className="text-sm font-bold text-slate-700">Role Icon</label>
                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center mb-4">
@@ -264,52 +423,64 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
                 </div>
 
                 {/* Right Column: Permissions */}
-                <div className="lg:col-span-2">
-                    <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200/50">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-900 font-display">Permissions</h3>
-                                <p className="text-sm text-slate-500">Configure what users with this role can access.</p>
+                <div className="lg:col-span-2 space-y-8">
+                    {permissionSections.map((section, sIdx) => (
+                        <div key={sIdx} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200/50">
+                            <div className="mb-8">
+                                <h3 className="text-lg font-bold text-slate-900 font-display">{section.title}</h3>
+                                <p className="text-sm text-slate-500">{section.desc}</p>
                             </div>
-                            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-lg uppercase tracking-wider">
-                                {Object.values(permissions).filter(Boolean).length} Active
-                            </span>
-                        </div>
 
-                        <div className="grid grid-cols-1 gap-4">
-                            {permissionConfig.map((perm) => (
-                                <div
-                                    key={perm.key}
-                                    onClick={() => togglePermission(perm.key as any)}
-                                    className={`relative group flex items-start gap-5 p-5 rounded-2xl border cursor-pointer transition-all duration-300 ${permissions[perm.key as keyof typeof permissions]
-                                        ? 'bg-blue-50/50 border-blue-200 shadow-sm'
-                                        : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200'
-                                        }`}
-                                >
-                                    <div className={`mt-1 p-3 rounded-2xl transition-colors ${permissions[perm.key as keyof typeof permissions]
-                                        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                        : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-slate-600 group-hover:shadow-md'
-                                        }`}>
-                                        <perm.icon className="h-6 w-6" />
-                                    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {section.permissions.map((perm) => {
+                                    const isSuperAdmin = name === 'Super Admin' || initialData?.name === 'Super Admin';
+                                    const isEnabled = permissions[perm.key as keyof typeof permissions];
 
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between gap-4">
-                                            <h4 className={`text-base font-bold ${permissions[perm.key as keyof typeof permissions] ? 'text-blue-900' : 'text-slate-900'}`}>
-                                                {perm.label}
-                                            </h4>
-                                            <div className={`relative flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${permissions[perm.key as keyof typeof permissions] ? 'bg-blue-600' : 'bg-slate-200'}`}>
-                                                <span className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${permissions[perm.key as keyof typeof permissions] ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    return (
+                                        <div
+                                            key={perm.key}
+                                            onClick={() => !isSuperAdmin && togglePermission(perm.key as any)}
+                                            className={`relative group flex items-start gap-4 p-4 rounded-2xl border transition-all duration-300 ${isSuperAdmin
+                                                ? 'bg-blue-50/50 border-blue-200 shadow-sm cursor-not-allowed'
+                                                : isEnabled
+                                                    ? 'bg-blue-50/50 border-blue-200 shadow-sm cursor-pointer'
+                                                    : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
+                                                }`}
+                                        >
+                                            {isSuperAdmin && (
+                                                <div className="absolute top-2 right-2">
+                                                    <LockClosedIcon className="h-4 w-4 text-blue-600" />
+                                                </div>
+                                            )}
+
+                                            <div className={`mt-1 p-2 rounded-xl transition-colors ${isEnabled
+                                                ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                                                : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-slate-600 group-hover:shadow-md'
+                                                }`}>
+                                                <perm.icon className="h-5 w-5" />
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h4 className={`text-sm font-bold ${isEnabled ? 'text-blue-900' : 'text-slate-900'}`}>
+                                                        {perm.label}
+                                                    </h4>
+                                                    <div className={`relative flex-shrink-0 h-5 w-9 border-2 border-transparent rounded-full transition-colors ease-in-out duration-200 focus:outline-none ${isEnabled ? 'bg-blue-600' : 'bg-slate-200'
+                                                        } ${isSuperAdmin ? 'opacity-70' : 'cursor-pointer'}`}>
+                                                        <span className={`pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${isEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                                                            }`} />
+                                                    </div>
+                                                </div>
+                                                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                                                    {perm.desc}
+                                                </p>
                                             </div>
                                         </div>
-                                        <p className="mt-1 text-sm text-slate-500 leading-relaxed max-w-lg">
-                                            {perm.desc}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
+                    ))}
                 </div>
             </div>
         </form>

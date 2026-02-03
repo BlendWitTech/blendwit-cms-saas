@@ -43,11 +43,13 @@ export class InvitationsService {
             <p>This link expires in 48 hours.</p>
         `;
 
-        const mailResult = await this.mailService.sendMail(data.email, 'Invitation to Blendwit CMS', html);
-        if (!mailResult) {
-            this.logger.error(`Failed to send invitation email to ${data.email}. However, the invitation record was created.`);
-        } else {
+        try {
+            await this.mailService.sendMail(data.email, 'Invitation to Blendwit CMS', html);
             this.logger.log(`Invitation email successfully sent to ${data.email}`);
+        } catch (error: any) {
+            this.logger.error(`Failed to send invitation email to ${data.email}: ${error.message}`);
+            // We dont want to delete the invitation if it was created, but we want the user to know it failed
+            throw new BadRequestException(`Invitation created, but email failed: ${error.message}`);
         }
 
         return invitation;
@@ -57,6 +59,26 @@ export class InvitationsService {
         return (this.prisma as any).invitation.findMany({
             orderBy: { createdAt: 'desc' },
         });
+    }
+
+    async verifyInvitation(token: string) {
+        const invitation = await (this.prisma as any).invitation.findUnique({
+            where: { token },
+        });
+
+        if (!invitation) {
+            throw new BadRequestException('Invalid invitation token.');
+        }
+
+        if (invitation.status !== 'PENDING') {
+            throw new BadRequestException(`Invitation is already ${invitation.status.toLowerCase()}.`);
+        }
+
+        if (new Date() > invitation.expiresAt) {
+            throw new BadRequestException('Invitation token has expired.');
+        }
+
+        return invitation;
     }
 
     async resendInvitation(id: string) {
@@ -82,20 +104,41 @@ export class InvitationsService {
             <p>This link expires in 48 hours.</p>
         `;
 
-        const mailResult = await this.mailService.sendMail(invitation.email, 'Updated Invitation: Blendwit CMS', html);
-        if (!mailResult) {
-            this.logger.error(`Failed to resend invitation email to ${invitation.email}`);
-            throw new BadRequestException('Failed to send email. Please check SMTP configuration.');
+        try {
+            await this.mailService.sendMail(invitation.email, 'Updated Invitation: Blendwit CMS', html);
+            this.logger.log(`Invitation resent to ${invitation.email}`);
+        } catch (error: any) {
+            this.logger.error(`Failed to resend invitation email to ${invitation.email}: ${error.message}`);
+            throw new BadRequestException(`Failed to send updated invitation: ${error.message}`);
         }
-
-        this.logger.log(`Invitation resent to ${invitation.email}`);
         return updated;
     }
 
     async revokeInvitation(id: string) {
-        return (this.prisma as any).invitation.update({
+        const invitation = await (this.prisma as any).invitation.findUnique({ where: { id } });
+        if (!invitation) {
+            throw new BadRequestException('Invitation not found.');
+        }
+
+        const updated = await (this.prisma as any).invitation.update({
             where: { id },
             data: { status: 'REVOKED' },
         });
+
+        const html = `
+            <h3>Invitation Revoked: Blendwit CMS</h3>
+            <p>We are writing to inform you that your invitation to join the Blendwit team has been revoked.</p>
+            <p>If you believe this is a mistake, please contact your administrator.</p>
+        `;
+
+        try {
+            await this.mailService.sendMail(invitation.email, 'Invitation Revoked: Blendwit CMS', html);
+            this.logger.log(`Revocation email sent to ${invitation.email}`);
+        } catch (error: any) {
+            this.logger.error(`Failed to send revocation email to ${invitation.email}: ${error.message}`);
+            // We still consider the revocation successful even if the email fails
+        }
+
+        return updated;
     }
 }

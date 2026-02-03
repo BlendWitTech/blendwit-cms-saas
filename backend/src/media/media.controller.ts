@@ -19,7 +19,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { IpGuard } from '../auth/ip.guard';
 import { AuditLogService } from '../audit-log/audit-log.service';
 
-@UseGuards(JwtAuthGuard, IpGuard)
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
+
+@UseGuards(JwtAuthGuard, IpGuard, PermissionsGuard)
 @Controller('media')
 export class MediaController {
     constructor(
@@ -28,16 +32,19 @@ export class MediaController {
     ) { }
 
     @Get()
+    @RequirePermissions(Permission.MEDIA_VIEW)
     findAll() {
         return this.mediaService.findAll();
     }
 
     @Patch(':id')
+    @RequirePermissions(Permission.MEDIA_UPLOAD)
     update(@Param('id') id: string, @Body() data: { altText?: string, folder?: string }) {
         return this.mediaService.update(id, data);
     }
 
     @Post('upload')
+    @RequirePermissions(Permission.MEDIA_UPLOAD)
     @UseInterceptors(
         FilesInterceptor('files', 10, { // Allow up to 10 files
             storage: diskStorage({
@@ -63,6 +70,7 @@ export class MediaController {
     }
 
     @Delete(':id')
+    @RequirePermissions(Permission.MEDIA_DELETE)
     async remove(@Param('id') id: string, @Request() req) {
         const res = await this.mediaService.remove(id);
         await this.auditLog.log(req.user.userId, 'MEDIA_DELETE', { id });
@@ -70,6 +78,7 @@ export class MediaController {
     }
 
     @Post('migrate')
+    @RequirePermissions(Permission.SETTINGS_EDIT)
     async migrate(@Request() req) {
         const results = await this.mediaService.migrateLocalToCloud();
         await this.auditLog.log(req.user.userId, 'MEDIA_MIGRATE_TO_CLOUD', results);

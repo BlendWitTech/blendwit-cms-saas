@@ -33,7 +33,10 @@ import {
     BuildingOfficeIcon,
     CreditCardIcon,
     Cog6ToothIcon,
-    BriefcaseIcon
+    BriefcaseIcon,
+    CloudArrowUpIcon,
+    FingerPrintIcon,
+    ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 function classNames(...classes: string[]) {
@@ -41,6 +44,7 @@ function classNames(...classes: string[]) {
 }
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { useNotification } from '@/context/NotificationContext';
 
@@ -49,6 +53,15 @@ export default function RolesPage() {
     const [roles, setRoles] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [isLoading, setIsLoading] = useState(true);
+
+    const router = useRouter();
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        if (searchParams.get('action') === 'new') {
+            router.replace('/dashboard/roles/create');
+        }
+    }, [searchParams]);
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
@@ -173,12 +186,61 @@ export default function RolesPage() {
     };
 
     const permissionIcons = [
-        { key: 'manage_content', icon: DocumentTextIcon, label: 'Content' },
-        { key: 'manage_media', icon: PhotoIcon, label: 'Media' },
-        { key: 'manage_users', icon: UsersIcon, label: 'Users' },
-        { key: 'manage_settings', icon: Cog6ToothIcon, label: 'Settings' },
-        { key: 'all', icon: GlobeAltIcon, label: 'Full Access' },
+        { key: 'users_view', icon: UsersIcon, label: 'View Users' },
+        { key: 'users_create', icon: PlusIcon, label: 'Create Users' },
+        { key: 'users_edit', icon: PencilSquareIcon, label: 'Edit Users' },
+        { key: 'users_delete', icon: TrashIcon, label: 'Delete Users' },
+        { key: 'roles_view', icon: ShieldCheckIcon, label: 'View Roles' },
+        { key: 'roles_create', icon: PlusIcon, label: 'Create Roles' },
+        { key: 'roles_edit', icon: PencilSquareIcon, label: 'Edit Roles' },
+        { key: 'roles_delete', icon: TrashIcon, label: 'Delete Roles' },
+        { key: 'content_view', icon: DocumentTextIcon, label: 'View Content' },
+        { key: 'content_create', icon: PlusIcon, label: 'Create Content' },
+        { key: 'content_edit', icon: PencilSquareIcon, label: 'Edit Content' },
+        { key: 'content_delete', icon: TrashIcon, label: 'Delete Content' },
+        { key: 'media_view', icon: PhotoIcon, label: 'View Media' },
+        { key: 'media_upload', icon: CloudArrowUpIcon, label: 'Upload Media' },
+        { key: 'media_delete', icon: TrashIcon, label: 'Delete Media' },
+        { key: 'settings_edit', icon: Cog6ToothIcon, label: 'Manage Settings' },
+        { key: 'audit_view', icon: FingerPrintIcon, label: 'View Audit Logs' },
+        { key: 'analytics_view', icon: ChartBarIcon, label: 'View Analytics' },
+        { key: 'seo_manage', icon: GlobeAltIcon, label: 'Manage SEO' }
     ];
+
+    const renderPermissionBadges = (role: any, maxVisible: number = 3) => {
+        if (role.name === 'Super Admin') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-[10px] font-black text-indigo-600 uppercase tracking-widest ring-1 ring-indigo-600/10">
+                    <GlobeAltIcon className="h-3 w-3" />
+                    Full Access
+                </span>
+            );
+        }
+
+        const enabledPermissions = permissionIcons.filter(perm => role.permissions?.[perm.key]);
+        const visiblePerms = enabledPermissions.slice(0, maxVisible);
+        const remainingCount = enabledPermissions.length - maxVisible;
+
+        if (enabledPermissions.length === 0) {
+            return <span className="text-[10px] font-medium text-slate-400">No permissions assigned</span>;
+        }
+
+        return (
+            <>
+                {visiblePerms.map(perm => (
+                    <span key={perm.key} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-widest ring-1 ring-blue-600/10 transition-colors group-hover:bg-blue-100">
+                        <perm.icon className="h-3 w-3" />
+                        {perm.label}
+                    </span>
+                ))}
+                {remainingCount > 0 && (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-[10px] font-black text-slate-600 uppercase tracking-widest ring-1 ring-slate-600/10" title={`${remainingCount} more permissions`}>
+                        +{remainingCount}
+                    </span>
+                )}
+            </>
+        );
+    };
 
     return (
         <div className="space-y-8 pb-20">
@@ -290,19 +352,9 @@ export default function RolesPage() {
                                         </div>
 
                                         <div className="flex flex-wrap gap-2 pt-2">
-                                            {role.name === 'Super Admin' ? (
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-[10px] font-black text-indigo-600 uppercase tracking-widest ring-1 ring-indigo-600/10">
-                                                    <GlobeAltIcon className="h-3 w-3" />
-                                                    Full Access
-                                                </span>
-                                            ) : (
-                                                permissionIcons.map(perm => role.permissions?.[perm.key] && (
-                                                    <span key={perm.key} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-widest ring-1 ring-blue-600/10 transition-colors group-hover:bg-blue-100">
-                                                        <perm.icon className="h-3 w-3" />
-                                                        {perm.label}
-                                                    </span>
-                                                ))
-                                            )}
+                                            <div className="flex flex-wrap gap-2 pt-2">
+                                                {renderPermissionBadges(role)}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -363,18 +415,7 @@ export default function RolesPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex flex-wrap gap-2">
-                                                    {role.name === 'Super Admin' ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-[10px] font-bold text-indigo-600 uppercase tracking-wide">
-                                                            Full Access
-                                                        </span>
-                                                    ) : (
-                                                        permissionIcons.slice(0, 3).map(perm => role.permissions?.[perm.key] && (
-                                                            <span key={perm.key} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                                                                {perm.label}
-                                                            </span>
-                                                        ))
-                                                    )}
-                                                    {/* Reminder: If more than 3 permissions, show count. (Basic implementation for now) */}
+                                                    {renderPermissionBadges(role, 4)}
                                                 </div>
                                             </td>
                                             <td className="pr-8 py-4 text-right">
@@ -409,7 +450,8 @@ export default function RolesPage() {
                         </div>
                     )}
                 </div>
-            )}
+            )
+            }
         </div>
     );
 }

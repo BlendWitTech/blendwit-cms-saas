@@ -1,18 +1,25 @@
-import { Controller, Post, UseInterceptors, UploadedFile, Get, BadRequestException, Param } from '@nestjs/common';
+import { Controller, Post, UseInterceptors, UploadedFile, Get, BadRequestException, Param, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ThemesService } from './themes.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../auth/permissions.guard';
+import { RequirePermissions } from '../auth/permissions.decorator';
+import { Permission } from '../auth/permissions.enum';
 
 @Controller('themes')
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ThemesController {
     constructor(private readonly themesService: ThemesService) { }
 
     @Post('upload')
+    @RequirePermissions(Permission.THEMES_MANAGE)
     @UseInterceptors(FileInterceptor('file'))
     async uploadTheme(@UploadedFile() file: Express.Multer.File) {
         return this.themesService.processThemeUpload(file);
     }
 
     @Get()
+    @RequirePermissions(Permission.THEMES_MANAGE)
     async listThemes() {
         return this.themesService.listThemes();
     }
@@ -23,11 +30,13 @@ export class ThemesController {
     }
 
     @Post(':name/setup')
+    @RequirePermissions(Permission.THEMES_MANAGE)
     async setupTheme(@Param('name') name: string) {
         return this.themesService.setupTheme(name);
     }
 
     @Post(':name/activate')
+    @RequirePermissions(Permission.THEMES_MANAGE)
     async activateTheme(@Param('name') name: string) {
         return this.themesService.setActiveTheme(name);
     }
