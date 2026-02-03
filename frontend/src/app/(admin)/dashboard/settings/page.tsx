@@ -23,6 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/lib/api';
 import Alert from '@/components/ui/Alert';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 import { useNotification } from '@/context/NotificationContext';
 
 function classNames(...classes: (string | boolean | undefined)[]) {
@@ -41,6 +42,10 @@ export default function SettingsPage() {
     const [isLogsLoading, setIsLogsLoading] = useState(false);
     const [logsPagination, setLogsPagination] = useState({ skip: 0, take: 10 });
     const [editModes, setEditModes] = useState<Record<string, boolean>>({});
+    const [cancelModal, setCancelModal] = useState<{ isOpen: boolean, section: string | null }>({
+        isOpen: false,
+        section: null
+    });
 
     const isSectionEditing = (section: string, keys: string[]) => {
         if (editModes[section]) return true;
@@ -53,11 +58,16 @@ export default function SettingsPage() {
     };
 
     const handleCancel = (section: string) => {
-        if (confirm('Discard your changes? This action cannot be undone.')) {
-            toggleEdit(section);
+        setCancelModal({ isOpen: true, section });
+    };
+
+    const confirmCancel = () => {
+        if (cancelModal.section) {
+            toggleEdit(cancelModal.section);
             // Reload settings to revert local state
             apiRequest('/settings').then(setSettings);
         }
+        setCancelModal({ isOpen: false, section: null });
     };
 
     useEffect(() => {
@@ -719,6 +729,17 @@ export default function SettingsPage() {
                     </div>
                 )}
             </div>
+
+            <ConfirmationModal
+                isOpen={cancelModal.isOpen}
+                onClose={() => setCancelModal({ isOpen: false, section: null })}
+                onConfirm={confirmCancel}
+                title="Discard Changes?"
+                message="Are you sure you want to discard your unsaved configurations? This action will revert all pending edits to their previous state."
+                confirmText="Discard Changes"
+                cancelText="Keep Editing"
+                variant="danger"
+            />
         </div>
     );
 }
