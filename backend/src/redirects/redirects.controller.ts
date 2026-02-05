@@ -30,7 +30,7 @@ export class RedirectsController {
     async create(@Body() data: any, @Request() req) {
         const result = await this.redirectsService.create(data);
         await this.auditLog.log(
-            req.user.userId,
+            req.user.id,
             'REDIRECT_CREATE',
             { fromPath: data.fromPath, toPath: data.toPath },
         );
@@ -41,7 +41,7 @@ export class RedirectsController {
     @RequirePermissions(Permission.SEO_MANAGE)
     async update(@Param('id') id: string, @Body() data: any, @Request() req) {
         const result = await this.redirectsService.update(id, data);
-        await this.auditLog.log(req.user.userId, 'REDIRECT_UPDATE', { id });
+        await this.auditLog.log(req.user.id, 'REDIRECT_UPDATE', { id });
         return result;
     }
 
@@ -49,7 +49,7 @@ export class RedirectsController {
     @RequirePermissions(Permission.SEO_MANAGE)
     async delete(@Param('id') id: string, @Request() req) {
         const result = await this.redirectsService.delete(id);
-        await this.auditLog.log(req.user.userId, 'REDIRECT_DELETE', { id });
+        await this.auditLog.log(req.user.id, 'REDIRECT_DELETE', { id });
         return result;
     }
 }

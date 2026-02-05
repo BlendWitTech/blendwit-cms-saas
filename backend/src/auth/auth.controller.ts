@@ -27,7 +27,7 @@ export class AuthController {
         const qrCode = await this.securityService.generateQrCode(user.email, secret);
 
         // Temporarily store the secret in the user record (not enabled yet)
-        await (this.usersService as any).updateTwoFactorSecret(user.userId, secret);
+        await (this.usersService as any).updateTwoFactorSecret(user.id, secret);
 
         return { qrCode, secret };
     }
@@ -49,7 +49,7 @@ export class AuthController {
             // Fallback for already logged in users enabling it?
             if (!req.user) throw new Error('Unauthorized');
             userEmail = req.user.email;
-            userId = req.user.userId;
+            userId = req.user.id;
         }
 
         const userDetails = await this.usersService.findOne(userEmail);
@@ -109,7 +109,7 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @Post('change-password')
     async changePassword(@Request() req, @Body('newPassword') newPass: string) {
-        return this.authService.changePassword(req.user.userId, newPass);
+        return this.authService.changePassword(req.user.id, newPass);
     }
     @Post('forgot-password')
     async forgotPassword(@Body('email') email: string) {

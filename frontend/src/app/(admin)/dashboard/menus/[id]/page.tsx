@@ -14,6 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiRequest } from '@/lib/api';
 import { useNotification } from '@/context/NotificationContext';
+import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 
 export default function MenuEditor({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -33,12 +34,25 @@ export default function MenuEditor({ params }: { params: Promise<{ id: string }>
         }
     }, [id]);
 
+    const [initialState, setInitialState] = useState<any>(null);
+    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
+
+    useEffect(() => {
+        if (!isNew) {
+            fetchMenu();
+        } else {
+            // For new menus, initial state is empty
+            setInitialState({ name: '', slug: '', items: [] });
+        }
+    }, [id]);
+
     const fetchMenu = async () => {
         try {
             const data = await apiRequest(`/menus/${id}`);
             setName(data.name);
             setSlug(data.slug);
             setItems(data.items || []);
+            setInitialState({ name: data.name, slug: data.slug, items: data.items || [] });
         } catch (error: any) {
             showToast(error.message || 'Failed to fetch menu', 'error');
             router.push('/dashboard/menus');
@@ -47,10 +61,24 @@ export default function MenuEditor({ params }: { params: Promise<{ id: string }>
         }
     };
 
+    const isDirty = () => {
+        if (!initialState) return false;
+        const current = { name, slug, items };
+        return JSON.stringify(current) !== JSON.stringify(initialState);
+    };
+
+    const handleBack = () => {
+        if (isDirty()) {
+            setShowUnsavedAlert(true);
+        } else {
+            router.back();
+        }
+    };
+
     const handleSave = async () => {
         if (!name || !slug) {
             showToast('Name and Slug are required', 'error');
-            return;
+            return false;
         }
 
         setIsSaving(true);
@@ -63,9 +91,12 @@ export default function MenuEditor({ params }: { params: Promise<{ id: string }>
                 await apiRequest(`/menus/${id}`, { method: 'PATCH', body });
                 showToast('Menu updated successfully', 'success');
             }
-            router.push('/dashboard/menus');
+            // Update initial state after successful save
+            setInitialState(body);
+            return true;
         } catch (error: any) {
             showToast(error.message || 'Failed to save menu', 'error');
+            return false;
         } finally {
             setIsSaving(false);
         }
@@ -96,10 +127,21 @@ export default function MenuEditor({ params }: { params: Promise<{ id: string }>
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500 pb-20">
+            <UnsavedChangesAlert
+                isOpen={showUnsavedAlert}
+                onSaveAndExit={async () => {
+                    const success = await handleSave();
+                    if (success) router.back();
+                }}
+                onDiscardAndExit={() => router.back()}
+                onCancel={() => setShowUnsavedAlert(false)}
+                isSaving={isSaving}
+            />
+
             {/* Header */}
             <div className="flex items-center justify-between bg-white/80 backdrop-blur-md p-4 rounded-[2rem] border border-slate-200/50 shadow-sm sticky top-4 z-20 mx-2">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="p-3 hover:bg-slate-50 rounded-2xl text-slate-500 transition-all hover:scale-105 active:scale-95">
+                    <button onClick={handleBack} className="p-3 hover:bg-slate-50 rounded-2xl text-slate-500 transition-all hover:scale-105 active:scale-95">
                         <ArrowLeftIcon className="h-5 w-5" strokeWidth={2.5} />
                     </button>
                     <div>
@@ -108,7 +150,7 @@ export default function MenuEditor({ params }: { params: Promise<{ id: string }>
                     </div>
                 </div>
                 <button
-                    onClick={handleSave}
+                    onClick={() => handleSave().then(success => { if (success) router.push('/dashboard/menus'); })}
                     disabled={isSaving}
                     className="flex items-center gap-2 bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-600/20 active:scale-95 disabled:opacity-50"
                 >

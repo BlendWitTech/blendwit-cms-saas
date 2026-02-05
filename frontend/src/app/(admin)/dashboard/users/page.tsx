@@ -14,7 +14,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+// ... (rest of imports unchanged, making sure Suspense is added)
 import InviteUserModal from '@/components/users/InviteUserModal';
 import ReactivationModal from '@/components/users/ReactivationModal';
 import ConfirmationModal from '@/components/ui/ConfirmationModal';
@@ -22,12 +23,13 @@ import UserFilters from '@/components/users/UserFilters';
 import TwoFactorSetup from '@/components/auth/TwoFactorSetup';
 import { useNotification } from '@/context/NotificationContext';
 import { formatDistanceToNow } from 'date-fns';
+import PermissionGuard from '@/components/auth/PermissionGuard';
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ');
 }
 
-export default function UsersPage() {
+function UsersPageContent() {
     const { showToast } = useNotification();
     const [users, setUsers] = useState<any[]>([]);
     const [roles, setRoles] = useState<any[]>([]);
@@ -377,13 +379,15 @@ export default function UsersPage() {
                         <ShieldCheckIcon className="h-4 w-4 text-emerald-600" />
                         Configure 2FA
                     </button>
-                    <button
-                        onClick={() => setIsInviteModalOpen(true)}
-                        className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none"
-                    >
-                        <PlusIcon className="h-4 w-4" strokeWidth={3} />
-                        Invite New User
-                    </button>
+                    <PermissionGuard permission="users_create">
+                        <button
+                            onClick={() => setIsInviteModalOpen(true)}
+                            className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none"
+                        >
+                            <PlusIcon className="h-4 w-4" strokeWidth={3} />
+                            Invite New User
+                        </button>
+                    </PermissionGuard>
                 </div>
             </div>
 
@@ -604,5 +608,17 @@ export default function UsersPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function UsersPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        }>
+            <UsersPageContent />
+        </Suspense>
     );
 }

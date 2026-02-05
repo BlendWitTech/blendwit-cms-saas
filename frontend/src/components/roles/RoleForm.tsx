@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; // Changed from Link import
-import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
-import {
+import { useForm } from '@/context/FormContext'; import {
     Cog6ToothIcon,
     BriefcaseIcon,
     AcademicCapIcon,
@@ -37,6 +36,7 @@ import {
     TrashIcon,
     LockClosedIcon
 } from '@heroicons/react/24/outline';
+import IconPicker from '@/components/ui/IconPicker';
 
 interface RoleFormProps {
     initialData?: any;
@@ -48,6 +48,7 @@ interface RoleFormProps {
 
 export default function RoleForm({ initialData, onSave, isLoading: externalLoading, title, subtitle }: RoleFormProps) {
     const router = useRouter();
+    const { setIsDirty } = useForm();
     const [name, setName] = useState('');
     const [level, setLevel] = useState(10);
     const [permissions, setPermissions] = useState({
@@ -80,7 +81,6 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
     });
     const [icon, setIcon] = useState('ShieldCheckIcon');
     const [isSaving, setIsSaving] = useState(false);
-    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
 
     // Capture initial state for comparison
     const [initialState, setInitialState] = useState<{ name: string, icon: string, level: number, permissions: any }>({
@@ -161,15 +161,24 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
         }
     }, [initialData]);
 
-    const isDirty = () => {
+    const checkDirty = () => {
         const currentPermissions = JSON.stringify(permissions);
         const initialPermissions = JSON.stringify(initialState.permissions);
         return name !== initialState.name || icon !== initialState.icon || level !== initialState.level || currentPermissions !== initialPermissions;
     };
 
+    // Sync dirty state with global context
+    useEffect(() => {
+        setIsDirty(checkDirty());
+    }, [name, icon, level, permissions, initialState, setIsDirty]);
+
+
     const handleCancelClick = () => {
-        if (isDirty()) {
-            setShowUnsavedAlert(true);
+        if (checkDirty()) {
+            if (confirm('You have unsaved changes. Are you sure you want to discard them?')) {
+                setIsDirty(false);
+                router.push('/dashboard/roles');
+            }
         } else {
             router.push('/dashboard/roles');
         }
@@ -179,6 +188,8 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
         setIsSaving(true);
         try {
             await onSave({ name, icon, level, ...permissions });
+            // onSave success should redirect, so we reset dirty here just in case
+            setIsDirty(false);
         } catch (error) {
             console.error(error);
         } finally {
@@ -285,18 +296,6 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
 
     return (
         <form onSubmit={handleSubmit} className="max-w-5xl mx-auto pb-20">
-            <UnsavedChangesAlert
-                isOpen={showUnsavedAlert}
-                onSaveAndExit={async () => {
-                    await saveChanges();
-                    // Assumes onSave redirects. If not, we might need router.push here if successful.
-                    // But onSave typically keeps us on page or redirects. 
-                    // Let's assume onSave handles it.
-                }}
-                onDiscardAndExit={() => router.push('/dashboard/roles')}
-                onCancel={() => setShowUnsavedAlert(false)}
-                isSaving={isSaving}
-            />
 
             {/* Header / Nav */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -397,26 +396,11 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-slate-700">Role Icon</label>
-                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center mb-4">
-                                    <CurrentIcon className="h-12 w-12 text-blue-600" />
-                                </div>
-                                <div className="grid grid-cols-5 gap-2">
-                                    {icons.map((item) => (
-                                        <button
-                                            key={item.name}
-                                            type="button"
-                                            title={item.label}
-                                            onClick={() => setIcon(item.name)}
-                                            className={`p-2 rounded-xl flex items-center justify-center transition-all aspect-square ${icon === item.name
-                                                ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20 scale-110 ring-2 ring-white'
-                                                : 'bg-white border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                                                }`}
-                                        >
-                                            <item.icon className="h-5 w-5" />
-                                        </button>
-                                    ))}
-                                </div>
+                                <IconPicker
+                                    value={icon}
+                                    onChange={setIcon}
+                                    label="Role Icon"
+                                />
                             </div>
                         </div>
                     </div>

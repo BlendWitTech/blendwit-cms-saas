@@ -21,6 +21,7 @@ import { apiRequest } from '@/lib/api';
 import AlertDialog from '@/components/ui/AlertDialog';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 import { useNotification } from '@/context/NotificationContext';
+import PermissionGuard from '@/components/auth/PermissionGuard';
 
 interface MediaItem {
     id: string;
@@ -157,6 +158,8 @@ export default function MediaLibrary({
             config['application/vnd.openxmlformats-officedocument.wordprocessingml.document'] = ['.docx'];
             config['application/vnd.ms-excel'] = ['.xls'];
             config['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] = ['.xlsx'];
+            config['model/gltf-binary'] = ['.glb'];
+            config['model/gltf+json'] = ['.gltf'];
         } else {
             // All
             config['image/*'] = ['.jpeg', '.jpg', '.png', '.webp', '.gif'];
@@ -167,6 +170,8 @@ export default function MediaLibrary({
             config['application/vnd.openxmlformats-officedocument.wordprocessingml.document'] = ['.docx'];
             config['application/vnd.ms-excel'] = ['.xls'];
             config['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'] = ['.xlsx'];
+            config['model/gltf-binary'] = ['.glb'];
+            config['model/gltf+json'] = ['.gltf'];
         }
         return config;
     };
@@ -174,8 +179,8 @@ export default function MediaLibrary({
     const acceptString = (() => {
         if (activeTab === 'images') return "image/*";
         if (activeTab === 'videos') return "video/*";
-        if (activeTab === 'docs') return ".pdf,.doc,.docx,.txt,.xls,.xlsx";
-        return "image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx";
+        if (activeTab === 'docs') return ".pdf,.doc,.docx,.txt,.xls,.xlsx,.glb,.gltf";
+        return "image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.glb,.gltf";
     })();
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -506,22 +511,24 @@ export default function MediaLibrary({
                     <div className="flex-1 overflow-y-auto custom-scrollbar pt-6 px-8">
                         <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4">
                             {/* Upload Card */}
-                            <label className="aspect-square bg-white rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 hover:bg-blue-50 hover:border-blue-500 hover:text-blue-600 transition-all cursor-pointer group relative overflow-hidden shadow-sm hover:shadow-md">
-                                <input type="file" className="hidden" multiple onChange={(e) => onDrop(Array.from(e.target.files || []))} disabled={isUploading} accept={acceptString} />
-                                {isUploading ? (
-                                    <div className="flex flex-col items-center gap-3">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-600 border-t-transparent"></div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest animate-pulse">Uploading...</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="p-3 bg-slate-50 rounded-full mb-3 group-hover:bg-blue-100 group-hover:scale-110 transition-all duration-300">
-                                            <CloudArrowUpIcon className="h-6 w-6" />
+                            <PermissionGuard permission="media_upload">
+                                <label className="aspect-square bg-white rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 hover:bg-blue-50 hover:border-blue-500 hover:text-blue-600 transition-all cursor-pointer group relative overflow-hidden shadow-sm hover:shadow-md">
+                                    <input type="file" className="hidden" multiple onChange={(e) => onDrop(Array.from(e.target.files || []))} disabled={isUploading} accept={acceptString} />
+                                    {isUploading ? (
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-600 border-t-transparent"></div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest animate-pulse">Uploading...</span>
                                         </div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">Add New</span>
-                                    </>
-                                )}
-                            </label>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-2 group-hover:scale-110 transition-transform">
+                                            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <CloudArrowUpIcon className="h-6 w-6" />
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Add New</span>
+                                        </div>
+                                    )}
+                                </label>
+                            </PermissionGuard>
 
                             {filteredMedia.map((item) => (
                                 <div
@@ -679,13 +686,15 @@ export default function MediaLibrary({
                                     <ArrowDownTrayIcon className="h-4 w-4" />
                                     Download
                                 </a>
-                                <button
-                                    onClick={(e) => handleDeleteClick(selectedMedia.id, e)}
-                                    className="flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all hover:-translate-y-0.5"
-                                >
-                                    <TrashIcon className="h-4 w-4" />
-                                    Delete
-                                </button>
+                                <PermissionGuard permission="media_delete" behavior="hide">
+                                    <button
+                                        onClick={(e) => handleDeleteClick(selectedMedia.id, e)}
+                                        className="flex items-center justify-center gap-2 py-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all hover:-translate-y-0.5"
+                                    >
+                                        <TrashIcon className="h-4 w-4" />
+                                        Delete
+                                    </button>
+                                </PermissionGuard>
                             </div>
 
                             <hr className="border-slate-100 my-2" />

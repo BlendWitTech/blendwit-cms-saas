@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
     PlusIcon,
     PencilSquareIcon,
@@ -21,10 +21,23 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import PostEditor from '@/components/blog/PostEditor';
 import MediaLibrary from '@/components/media/MediaLibrary';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
+import AlertDialog from '@/components/ui/AlertDialog';
 import { useNotification } from '@/context/NotificationContext';
+import { useForm } from '@/context/FormContext';
+import { apiRequest } from '@/lib/api';
+import PermissionGuard from '@/components/auth/PermissionGuard';
 
-export default function BlogPage() {
-    const [view, setView] = useState<'list' | 'editor'>('list');
+function BlogPageContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const { showToast } = useNotification();
+    const { isDirty, setIsDirty } = useForm();
+
+    // View derived from URL
+    const action = searchParams.get('action');
+    const actionId = searchParams.get('id');
+    const view = action === 'new' || (action === 'edit' && actionId) ? 'editor' : 'list';
+
     const [posts, setPosts] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [tags, setTags] = useState<any[]>([]);
@@ -48,6 +61,10 @@ export default function BlogPage() {
     const [initialState, setInitialState] = useState<any>(defaultFormData);
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; id: string | null }>({
+        isOpen: false,
+        id: null
+    });
 
     const [currentPostId, setCurrentPostId] = useState<string | null>(null);
     const [isMediaOpen, setIsMediaOpen] = useState(false);
@@ -56,38 +73,42 @@ export default function BlogPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
-    const { showToast } = useNotification();
 
     useEffect(() => {
         fetchInitialData();
     }, []);
 
-    const router = useRouter();
-    const searchParams = useSearchParams();
-
+    // Effect to handle URL-based data loading for Edit/New mode
     useEffect(() => {
-        if (searchParams.get('action') === 'new' && !isLoading) {
-            handleCreate();
-            router.replace('/dashboard/blog', { scroll: false });
+        if (view === 'editor' && action === 'edit' && actionId) {
+            const post = posts.find(p => p.id === actionId);
+            if (post) {
+                populateForm(post);
+            } else if (!isLoading && posts.length > 0) {
+                // If loaded but not found (pagination?), fetch specific
+                fetchPost(actionId);
+            }
+        } else if (view === 'editor' && action === 'new') {
+            if (currentPostId !== null) {
+                resetForm();
+            }
         }
-    }, [searchParams, isLoading]);
+    }, [view, action, actionId, posts, isLoading]);
+
+    // Sync isDirty with FormContext
+    useEffect(() => {
+        const dirty = JSON.stringify(formData) !== JSON.stringify(initialState);
+        setIsDirty(dirty);
+    }, [formData, initialState, setIsDirty]);
 
     const fetchInitialData = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
         try {
-            const [postsRes, catsRes, tagsRes, profileRes] = await Promise.all([
-                fetch('http://localhost:3001/blogs', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('http://localhost:3001/categories', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('http://localhost:3001/tags', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('http://localhost:3001/auth/profile', { headers: { 'Authorization': `Bearer ${token}` } })
+            const [postsData, catsData, tagsData, profile] = await Promise.all([
+                apiRequest('/blogs'),
+                apiRequest('/categories'),
+                apiRequest('/tags'),
+                apiRequest('/auth/profile')
             ]);
-
-            const postsData = await postsRes.json();
-            const catsData = await catsRes.json();
-            const tagsData = await tagsRes.json();
-            const profile = await profileRes.json();
 
             setPosts(Array.isArray(postsData) ? postsData : []);
             setCategories(Array.isArray(catsData) ? catsData : []);
@@ -103,18 +124,17 @@ export default function BlogPage() {
         }
     };
 
-    const isDirty = () => {
-        return JSON.stringify(formData) !== JSON.stringify(initialState);
+    const fetchPost = async (id: string) => {
+        try {
+            const post = await apiRequest(`/blogs/${id}`);
+            if (post) populateForm(post);
+        } catch (error) {
+            showToast('Failed to load post', 'error');
+            router.push('/dashboard/blog');
+        }
     };
 
-    const handleCreate = () => {
-        setFormData(defaultFormData);
-        setInitialState(defaultFormData);
-        setCurrentPostId(null);
-        setView('editor');
-    };
-
-    const handleEdit = (post: any) => {
+    const populateForm = (post: any) => {
         const data = {
             title: post.title,
             slug: post.slug,
@@ -130,48 +150,57 @@ export default function BlogPage() {
         setFormData(data);
         setInitialState(data);
         setCurrentPostId(post.id);
-        setView('editor');
+    };
+
+    const resetForm = () => {
+        setFormData(defaultFormData);
+        setInitialState(defaultFormData);
+        setCurrentPostId(null);
+    };
+
+    const handleCreate = () => {
+        resetForm();
+        router.push('/dashboard/blog?action=new');
+    };
+
+    const handleEdit = (post: any) => {
+        populateForm(post);
+        router.push(`/dashboard/blog?action=edit&id=${post.id}`);
     };
 
     const handleBackClick = () => {
-        if (isDirty()) {
+        if (isDirty) {
             setShowUnsavedAlert(true);
         } else {
-            setView('list');
+            router.back();
         }
     };
 
     const handleSave = async () => {
         setIsSaving(true);
-        const token = localStorage.getItem('token');
-        const url = currentPostId
-            ? `http://localhost:3001/blogs/${currentPostId}`
-            : 'http://localhost:3001/blogs';
+        const url = currentPostId ? `/blogs/${currentPostId}` : '/blogs';
         const method = currentPostId ? 'PATCH' : 'POST';
 
         try {
-            const res = await fetch(url, {
+            // Sanitize payload
+            const payload = {
+                ...formData,
+                publishedAt: formData.publishedAt ? new Date(formData.publishedAt).toISOString() : undefined,
+                seo: (!formData.seo.title && !formData.seo.description) ? undefined : formData.seo
+            };
+
+            await apiRequest(url, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
+                body: payload
             });
 
-            if (res.ok) {
-                showToast('Post saved successfully!', 'success');
-                fetchInitialData();
-                setInitialState(formData); // Update initial state to match saved
-                // If integrated with alert, we might want to close view too if implicit save & exit
-                // But usually Save button just saves.
-                // However, if called from Alert's "Save & Exit", we should exit.
-                // We'll return true if success to let caller know.
-                return true;
-            } else {
-                showToast('Failed to save post.', 'error');
-                return false;
-            }
+            showToast('Post saved successfully!', 'success');
+            setIsDirty(false);
+            fetchInitialData();
+            setInitialState(formData);
+
+            router.back();
+            return true;
         } catch (error) {
             console.error(error);
             return false;
@@ -190,33 +219,52 @@ export default function BlogPage() {
         });
     };
 
-    const handleTagInput = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const val = e.currentTarget.value.trim();
-            if (val && !formData.tags.includes(val)) {
-                setFormData((prev: any) => ({ ...prev, tags: [...prev.tags, val] }));
-                e.currentTarget.value = '';
-            }
-        }
-    };
-
     // Ensure we reset alert state when view changes
     useEffect(() => {
         setShowUnsavedAlert(false);
     }, [view]);
 
+    const handleDeleteClick = (id: string) => {
+        setDeleteConfirmation({ isOpen: true, id });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteConfirmation.id) return;
+        try {
+            await apiRequest(`/blogs/${deleteConfirmation.id}`, { method: 'DELETE' });
+            showToast('Post deleted successfully', 'success');
+            fetchInitialData();
+            setDeleteConfirmation({ isOpen: false, id: null });
+        } catch (error) {
+            console.error(error);
+            showToast('Failed to delete post', 'error');
+            setDeleteConfirmation({ isOpen: false, id: null });
+        }
+    };
+
 
     if (view === 'editor') {
         return (
             <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                <AlertDialog
+                    isOpen={deleteConfirmation.isOpen}
+                    title="Delete Post"
+                    description="Are you sure you want to delete this post? This action cannot be undone."
+                    confirmLabel="Delete Post"
+                    cancelLabel="Cancel"
+                    variant="danger"
+                    onConfirm={confirmDelete}
+                    onCancel={() => setDeleteConfirmation({ isOpen: false, id: null })}
+                />
                 <UnsavedChangesAlert
                     isOpen={showUnsavedAlert}
                     onSaveAndExit={async () => {
                         const success = await handleSave();
-                        if (success) setView('list');
                     }}
-                    onDiscardAndExit={() => setView('list')}
+                    onDiscardAndExit={() => {
+                        setIsDirty(false);
+                        router.push('/dashboard/blog');
+                    }}
                     onCancel={() => setShowUnsavedAlert(false)}
                     isSaving={isSaving}
                 />
@@ -242,7 +290,7 @@ export default function BlogPage() {
                             <option value="PUBLISHED">Published</option>
                             <option value="ARCHIVED">Archived</option>
                         </select>
-                        <button onClick={() => handleSave()} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95">
+                        <button onClick={() => handleSave()} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
                             <CloudArrowUpIcon className="h-4 w-4" />
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </button>
@@ -468,6 +516,16 @@ export default function BlogPage() {
 
     return (
         <div className="space-y-6">
+            <AlertDialog
+                isOpen={deleteConfirmation.isOpen}
+                title="Delete Post"
+                description="Are you sure you want to delete this post? This action cannot be undone."
+                confirmLabel="Delete Post"
+                cancelLabel="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteConfirmation({ isOpen: false, id: null })}
+            />
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
                 <div>
@@ -477,12 +535,12 @@ export default function BlogPage() {
                     <p className="mt-1 text-xs text-slate-500 font-semibold tracking-tight">Create, edit and manage your blog posts and articles.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {canManageContent && (
-                        <button onClick={handleCreate} className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none">
+                    <PermissionGuard permission="content_create">
+                        <button onClick={handleCreate} className="inline-flex items-center gap-x-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 leading-none">
                             <PlusIcon className="h-4 w-4" strokeWidth={3} />
                             New Post
                         </button>
-                    )}
+                    </PermissionGuard>
                 </div>
             </div>
 
@@ -604,7 +662,7 @@ export default function BlogPage() {
                                                         <button onClick={() => handleEdit(post)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all">
                                                             <PencilSquareIcon className="h-4 w-4" />
                                                         </button>
-                                                        <button className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
+                                                        <button onClick={() => handleDeleteClick(post.id)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
                                                             <TrashIcon className="h-4 w-4" />
                                                         </button>
                                                     </div>
@@ -618,5 +676,17 @@ export default function BlogPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function BlogPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        }>
+            <BlogPageContent />
+        </Suspense>
     );
 }

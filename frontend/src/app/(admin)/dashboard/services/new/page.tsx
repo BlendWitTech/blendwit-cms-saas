@@ -34,10 +34,13 @@ export default function NewServicePage() {
         try {
             await apiRequest('/services', {
                 method: 'POST',
-                body: JSON.stringify({
-                    ...data,
+                body: {
+                    title: data.title,
+                    description: data.description,
+                    icon: data.icon,
+                    processSteps: (data as any).processSteps, // Assuming processSteps might be added later or is optional
                     order: Number(data.order)
-                })
+                }
             });
             showToast('Service created successfully', 'success');
             router.push('/dashboard/services');

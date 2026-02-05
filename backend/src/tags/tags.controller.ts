@@ -6,12 +6,11 @@ import { RequirePermissions } from '../auth/permissions.decorator';
 import { Permission } from '../auth/permissions.enum';
 
 @Controller('tags')
-@UseGuards(PermissionsGuard)
 export class TagsController {
     constructor(private readonly tagsService: TagsService) { }
 
-    @UseGuards(JwtAuthGuard)
     @Post()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.CONTENT_CREATE)
     create(@Body() createTagDto: any) {
         return this.tagsService.create(createTagDto);
@@ -22,8 +21,8 @@ export class TagsController {
         return this.tagsService.findAll();
     }
 
-    @UseGuards(JwtAuthGuard)
     @Delete(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.CONTENT_DELETE)
     remove(@Param('id') id: string) {
         return this.tagsService.remove(id);

@@ -20,7 +20,7 @@ export class InvitationsController {
     async create(@Body() data: { email: string; role: string; ips: string[] }, @Req() req: any) {
         try {
             // Enforce role hierarchy check
-            await this.accessControl.validateRoleAssignment(req.user.userId, data.role);
+            await this.accessControl.validateRoleAssignment(req.user.id, data.role);
 
             return await this.invitationsService.createInvitation({
                 email: data.email,

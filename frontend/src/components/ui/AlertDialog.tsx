@@ -8,7 +8,7 @@ interface AlertDialogProps {
     description: string;
     confirmLabel?: string;
     cancelLabel?: string;
-    variant?: 'danger' | 'info';
+    variant?: 'danger' | 'info' | 'success' | 'warning';
     onConfirm: () => void;
     onCancel: () => void;
 }
@@ -40,9 +40,17 @@ export default function AlertDialog({
                 <div className="flex gap-4">
                     <div className={`shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center ${variant === 'danger'
                         ? 'bg-red-50 text-red-600'
-                        : 'bg-blue-50 text-blue-600'
+                        : variant === 'success'
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : variant === 'warning'
+                                ? 'bg-amber-50 text-amber-600'
+                                : 'bg-blue-50 text-blue-600'
                         }`}>
                         {variant === 'danger' ? (
+                            <ExclamationTriangleIcon className="h-6 w-6" />
+                        ) : variant === 'success' ? (
+                            <InformationCircleIcon className="h-6 w-6" /> // You might want CheckCircleIcon here if available
+                        ) : variant === 'warning' ? (
                             <ExclamationTriangleIcon className="h-6 w-6" />
                         ) : (
                             <InformationCircleIcon className="h-6 w-6" />
@@ -64,7 +72,7 @@ export default function AlertDialog({
                     {/* Cancel Button */}
                     <button
                         onClick={onCancel}
-                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-800 transition-all"
                     >
                         {cancelLabel}
                     </button>
@@ -82,9 +90,11 @@ export default function AlertDialog({
                     {/* Primary Button (Confirm) */}
                     <button
                         onClick={onConfirm}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all active:scale-95 ${variant === 'danger'
+                        className={`px-6 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-all active:scale-95 ${variant === 'danger'
                             ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30'
-                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
+                            : variant === 'success'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/30'
+                                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30'
                             }`}
                     >
                         {confirmLabel}

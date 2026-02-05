@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus';
+import React, { useState, useEffect } from 'react';
+import { useEditor, EditorContent, TiptapBubbleMenu as BubbleMenu } from '@tiptap/react';
+
+// @ts-ignore
+const AnyBubbleMenu = BubbleMenu as any;
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
@@ -99,6 +101,7 @@ const H3Icon = () => <span className="text-[10px] font-black leading-none">H3</s
 const MenuButton = ({ onClick, isActive = false, icon: Icon, title }: any) => (
     <button
         onClick={onClick}
+        onMouseDown={(e) => e.preventDefault()}
         title={title}
         className={`p-2 rounded-xl transition-all duration-200 ${isActive
             ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 scale-105'
@@ -112,6 +115,7 @@ const MenuButton = ({ onClick, isActive = false, icon: Icon, title }: any) => (
 const BubbleButton = ({ onClick, isActive = false, icon: Icon, label }: any) => (
     <button
         onClick={onClick}
+        onMouseDown={(e) => e.preventDefault()}
         title={label}
         className={`p-2 rounded-xl transition-all duration-200 ${isActive
             ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
@@ -220,6 +224,7 @@ const MenuBar = ({ editor, onOpenMedia }: { editor: any, onOpenMedia: () => void
 
 export default function PostEditor({ content, onChange }: { content: string, onChange: (html: string) => void }) {
     const [isMediaOpen, setIsMediaOpen] = useState(false);
+    const [, forceUpdate] = useState(0);
 
     const editor = useEditor({
         extensions: [
@@ -323,8 +328,28 @@ export default function PostEditor({ content, onChange }: { content: string, onC
         onUpdate: ({ editor }) => {
             onChange(editor.getHTML());
         },
+        onSelectionUpdate: () => {
+            // Force re-render to update menu bar active states
+            forceUpdate(n => n + 1);
+        },
+        onTransaction: () => {
+            // Force re-render for undo/redo state and other transactions
+            forceUpdate(n => n + 1);
+        },
         immediatelyRender: false,
     });
+
+    // Update editor content when prop changes (e.g. loading from DB)
+    useEffect(() => {
+        if (editor && content && editor.getHTML() !== content) {
+            // Check if content is actually different to avoid cursor jumping or loops
+            // For simple use cases, this specific check is usually enough, or we can use JSON comparison
+            // Simplified check: only update if editor content is very different or empty
+            if (Math.abs(content.length - editor.getHTML().length) > 10 || !editor.getText()) {
+                editor.commands.setContent(content);
+            }
+        }
+    }, [content, editor]);
 
     const handleSelectImage = (url: string) => {
         if (editor) {
@@ -340,11 +365,12 @@ export default function PostEditor({ content, onChange }: { content: string, onC
     };
 
     return (
-        <div className="border border-slate-200 rounded-2xl bg-white shadow-2xl shadow-slate-200/40 focus-within:ring-8 focus-within:ring-blue-600/5 transition-all duration-500 overflow-hidden">
+        <div className="border border-slate-200 rounded-2xl bg-white shadow-2xl shadow-slate-200/40 focus-within:ring-8 focus-within:ring-blue-600/5 transition-all duration-500">
             {editor && (
-                <BubbleMenu
+                <AnyBubbleMenu
                     editor={editor}
-                    shouldShow={({ editor }) => editor.isActive('image')}
+                    tippyOptions={{ duration: 100, zIndex: 999, maxWidth: 'none', placement: 'top' }}
+                    shouldShow={({ editor }: any) => editor.isActive('image')}
 
                 >
                     <div className="flex items-center gap-1 p-1 bg-white rounded-2xl shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 overflow-hidden">
@@ -405,7 +431,7 @@ export default function PostEditor({ content, onChange }: { content: string, onC
                             })()}
                         </div>
                     </div>
-                </BubbleMenu>
+                </AnyBubbleMenu>
             )
             }
 

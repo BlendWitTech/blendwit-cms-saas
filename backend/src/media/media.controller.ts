@@ -65,7 +65,7 @@ export class MediaController {
             const result = await this.mediaService.create(file);
             results.push(result);
         }
-        await this.auditLog.log(req.user.userId, 'MEDIA_UPLOAD', { count: files.length, filenames: files.map(f => f.originalname) });
+        await this.auditLog.log(req.user.id, 'MEDIA_UPLOAD', { count: files.length, filenames: files.map(f => f.originalname) });
         return results;
     }
 
@@ -73,7 +73,7 @@ export class MediaController {
     @RequirePermissions(Permission.MEDIA_DELETE)
     async remove(@Param('id') id: string, @Request() req) {
         const res = await this.mediaService.remove(id);
-        await this.auditLog.log(req.user.userId, 'MEDIA_DELETE', { id });
+        await this.auditLog.log(req.user.id, 'MEDIA_DELETE', { id });
         return res;
     }
 
@@ -81,7 +81,7 @@ export class MediaController {
     @RequirePermissions(Permission.SETTINGS_EDIT)
     async migrate(@Request() req) {
         const results = await this.mediaService.migrateLocalToCloud();
-        await this.auditLog.log(req.user.userId, 'MEDIA_MIGRATE_TO_CLOUD', results);
+        await this.auditLog.log(req.user.id, 'MEDIA_MIGRATE_TO_CLOUD', results);
         return results;
     }
 }

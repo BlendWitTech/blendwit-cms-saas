@@ -41,7 +41,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
                 title: data.title,
                 slug: data.slug,
                 content: data.content || '',
-                description: data.description || '',
+                description: data.seo?.description || '',
                 status: data.status
             });
         } catch (error: any) {
@@ -66,7 +66,13 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
         try {
             await apiRequest(`/pages/${id}`, {
                 method: 'PATCH',
-                body: formData,
+                body: {
+                    ...formData,
+                    seo: {
+                        title: formData.title, // Default title if not separate
+                        description: formData.description
+                    }
+                },
                 skipNotification: true
             });
             showToast('Page updated successfully', 'success');

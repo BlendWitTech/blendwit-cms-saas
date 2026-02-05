@@ -6,12 +6,11 @@ import { RequirePermissions } from '../auth/permissions.decorator';
 import { Permission } from '../auth/permissions.enum';
 
 @Controller('project-categories')
-@UseGuards(PermissionsGuard)
 export class ProjectCategoriesController {
     constructor(private readonly projectCategoriesService: ProjectCategoriesService) { }
 
     @Post()
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.CONTENT_CREATE)
     create(@Body() createDto: { name: string; description?: string; slug?: string }) {
         return this.projectCategoriesService.create(createDto);
@@ -28,14 +27,14 @@ export class ProjectCategoriesController {
     }
 
     @Patch(':id')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.CONTENT_EDIT)
     update(@Param('id') id: string, @Body() updateDto: { name?: string; description?: string; slug?: string }) {
         return this.projectCategoriesService.update(id, updateDto);
     }
 
     @Delete(':id')
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.CONTENT_DELETE)
     remove(@Param('id') id: string) {
         return this.projectCategoriesService.remove(id);

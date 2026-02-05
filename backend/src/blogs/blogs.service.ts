@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
-
 import { SeoMetaService } from '../seo-meta/seo-meta.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BlogsService {
     constructor(
         private prisma: PrismaService,
-        private seoMetaService: SeoMetaService
+        private seoMetaService: SeoMetaService,
+        private notificationsService: NotificationsService
     ) { }
 
     async create(authorId: string, createPostDto: any) {
@@ -53,6 +54,14 @@ export class BlogsService {
             });
         }
 
+        await this.notificationsService.create({
+            type: 'SUCCESS',
+            title: 'New Blog Post',
+            message: `Blog post "${post.title}" was created.`,
+            link: `/dashboard/blog?edit=${post.id}`,
+            targetRole: 'Admin'
+        });
+
         return post;
     }
 
@@ -62,7 +71,7 @@ export class BlogsService {
         if (category) where.categories = { some: { slug: category } };
         if (tag) where.tags = { some: { slug: tag } };
 
-        return (this.prisma as any).post.findMany({
+        const posts = await (this.prisma as any).post.findMany({
             where,
             include: {
                 author: { select: { name: true, email: true } },
@@ -72,6 +81,13 @@ export class BlogsService {
             },
             orderBy: { createdAt: 'desc' },
         });
+
+        const postsWithSeo = await Promise.all(posts.map(async (post: any) => {
+            const seo = await this.seoMetaService.findByPage('post', post.id);
+            return { ...post, seo };
+        }));
+
+        return postsWithSeo;
     }
 
     async findOne(slug: string) {
@@ -154,10 +170,28 @@ export class BlogsService {
             });
         }
 
+        await this.notificationsService.create({
+            type: 'INFO',
+            title: 'Blog Post Updated',
+            message: `Blog post "${post.title}" was updated.`,
+            link: `/dashboard/blog?edit=${post.id}`,
+            targetRole: 'Admin'
+        });
+
         return post;
     }
 
     async remove(id: string) {
+        const post = await (this.prisma as any).post.findUnique({ where: { id } });
+        if (post) {
+            await this.seoMetaService.deleteByPage('post', id);
+            await this.notificationsService.create({
+                type: 'DANGER',
+                title: 'Blog Post Deleted',
+                message: `Blog post "${post.title}" was deleted.`,
+                targetRole: 'Admin'
+            });
+        }
         return (this.prisma as any).post.delete({
             where: { id },
         });

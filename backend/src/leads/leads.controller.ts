@@ -6,7 +6,6 @@ import { RequirePermissions } from '../auth/permissions.decorator';
 import { Permission } from '../auth/permissions.enum';
 
 @Controller('leads')
-@UseGuards(PermissionsGuard)
 export class LeadsController {
     constructor(private readonly leadsService: LeadsService) { }
 
@@ -15,50 +14,50 @@ export class LeadsController {
         return this.leadsService.create(createLeadDto);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Post()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_MANAGE)
     create(@Body() createLeadDto: any) {
         return this.leadsService.create(createLeadDto);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Get()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_VIEW)
     findAll(@Query('status') status?: string) {
         return this.leadsService.findAll(status);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Get('stats')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_VIEW)
     getStats() {
         return this.leadsService.getStats();
     }
 
-    @UseGuards(JwtAuthGuard)
     @Get(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_VIEW)
     findOne(@Param('id') id: string) {
         return this.leadsService.findOne(id);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Patch(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_MANAGE)
     update(@Param('id') id: string, @Body() updateLeadDto: any) {
         return this.leadsService.update(id, updateLeadDto);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Patch(':id/status')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_MANAGE)
     updateStatus(@Param('id') id: string, @Body('status') status: string) {
         return this.leadsService.updateStatus(id, status);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Delete(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.LEADS_MANAGE) // Could use LEADS_DELETE if exists, relying on MANAGE for now per enum analysis
     remove(@Param('id') id: string) {
         return this.leadsService.remove(id);

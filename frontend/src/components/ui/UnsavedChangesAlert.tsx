@@ -14,6 +14,7 @@ interface UnsavedChangesAlertProps {
     confirmLabel?: string;
     secondaryLabel?: string;
     cancelLabel?: string;
+    variant?: 'info' | 'danger' | 'success' | 'warning';
 }
 
 export default function UnsavedChangesAlert({
@@ -27,13 +28,14 @@ export default function UnsavedChangesAlert({
     confirmLabel,
     secondaryLabel,
     cancelLabel,
+    variant = 'info',
 }: UnsavedChangesAlertProps) {
     return (
         <AlertDialog
             isOpen={isOpen}
             title={title}
             description={description}
-            variant="info"
+            variant={variant}
             confirmLabel={isSaving ? 'Saving...' : (confirmLabel || 'Save & Exit')}
             onConfirm={onSaveAndExit || (() => { })}
             secondaryLabel={secondaryLabel || "Discard Changes"}

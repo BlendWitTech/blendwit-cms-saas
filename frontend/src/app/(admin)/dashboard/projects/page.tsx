@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
     PlusIcon,
     PencilSquareIcon,
@@ -14,14 +14,23 @@ import {
 } from '@heroicons/react/24/outline';
 import MediaLibrary from '@/components/media/MediaLibrary';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
+import AlertDialog from '@/components/ui/AlertDialog';
 import { useNotification } from '@/context/NotificationContext';
 import { apiRequest } from '@/lib/api';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function ProjectsPage() {
+import { useForm } from '@/context/FormContext';
+import PermissionGuard from '@/components/auth/PermissionGuard';
+
+function ProjectsPageContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const [view, setView] = useState<'list' | 'editor'>('list');
+    const { setIsDirty } = useForm();
+
+    // Derived state from URL
+    const view = searchParams.get('action') === 'new' || searchParams.get('action') === 'edit' ? 'editor' : 'list';
+    const actionId = searchParams.get('id');
+
     const [projects, setProjects] = useState<any[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -47,11 +56,11 @@ export default function ProjectsPage() {
 
     const [formData, setFormData] = useState<any>(defaultFormData);
     const [initialState, setInitialState] = useState<any>(defaultFormData);
-    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
+    const [showExitAlert, setShowExitAlert] = useState(false); // Re-introduced for local back button
     const [isSaving, setIsSaving] = useState(false);
     const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
     const [isMediaOpen, setIsMediaOpen] = useState(false);
-    const [mediaTarget, setMediaTarget] = useState<'cover' | 'gallery' | 'banner'>('cover');
+    const [mediaTarget, setMediaTarget] = useState<'cover' | 'gallery' | 'banner' | 'heroVideo' | 'model3d'>('cover');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const { showToast } = useNotification();
@@ -60,14 +69,54 @@ export default function ProjectsPage() {
         fetchInitialData();
     }, []);
 
+    // Sync isDirty with FormContext
     useEffect(() => {
-        // Auto-open create mode if query param exists
-        if (searchParams.get('action') === 'new' && !isLoading) {
-            handleCreate();
-            // Clear param without refresh
-            router.replace('/dashboard/projects', { scroll: false });
+        const dirty = JSON.stringify(formData) !== JSON.stringify(initialState);
+        setIsDirty(dirty);
+    }, [formData, initialState, setIsDirty]);
+
+    useEffect(() => {
+        // Handle URL-based initialization
+        const action = searchParams.get('action');
+        const id = searchParams.get('id');
+
+        if (!isLoading) {
+            if (action === 'new') {
+                const initial = { ...defaultFormData, categoryId: categories[0]?.id || '' };
+                setFormData(initial);
+                setInitialState(initial);
+                setCurrentProjectId(null);
+            } else if (action === 'edit' && id) {
+                const project = projects.find(p => p.id === id);
+                if (project) {
+                    const data = {
+                        title: project.title,
+                        slug: project.slug,
+                        description: project.description,
+                        coverImage: project.coverImage || '',
+                        bannerImage: project.bannerImage || '',
+                        heroVideo: project.heroVideo || '',
+                        gallery: project.gallery || [],
+                        model3dUrl: project.model3dUrl || '',
+                        status: project.status,
+                        categoryId: project.category?.id || '',
+                        client: project.client || '',
+                        completionDate: project.completionDate || '',
+                        location: project.location || '',
+                        featured: project.featured,
+                        seoMeta: {
+                            title: project.seoMeta?.title || '',
+                            description: project.seoMeta?.description || '',
+                            keywords: project.seoMeta?.keywords?.join(', ') || ''
+                        }
+                    };
+                    setFormData(data);
+                    setInitialState(data);
+                    setCurrentProjectId(id);
+                }
+            }
         }
-    }, [searchParams, isLoading]);
+    }, [searchParams, isLoading, projects, categories]); // Re-run when projects load
 
     const fetchInitialData = async () => {
         try {
@@ -78,7 +127,7 @@ export default function ProjectsPage() {
 
             setProjects(Array.isArray(projectsData) ? projectsData : []);
             setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-            setCanManageContent(true); // Assuming admin access if they can see this page
+            setCanManageContent(true);
         } catch (error) {
             console.error('Failed to fetch data', error);
         } finally {
@@ -86,50 +135,27 @@ export default function ProjectsPage() {
         }
     };
 
-    const isDirty = () => JSON.stringify(formData) !== JSON.stringify(initialState);
-
     const handleCreate = () => {
-        const initial = { ...defaultFormData, categoryId: categories[0]?.id || '' };
-        setFormData(initial);
-        setInitialState(initial);
-        setCurrentProjectId(null);
-        setView('editor');
+        router.push('/dashboard/projects?action=new');
     };
 
     const handleEdit = (project: any) => {
-        const data = {
-            title: project.title,
-            slug: project.slug,
-            description: project.description,
-            coverImage: project.coverImage || '',
-            bannerImage: project.bannerImage || '',
-            heroVideo: project.heroVideo || '',
-            gallery: project.gallery || [],
-            model3dUrl: project.model3dUrl || '',
-            status: project.status,
-            categoryId: project.category?.id || '',
-            client: project.client || '',
-            completionDate: project.completionDate || '',
-            location: project.location || '',
-            featured: project.featured,
-            seoMeta: {
-                title: project.seoMeta?.title || '',
-                description: project.seoMeta?.description || '',
-                keywords: project.seoMeta?.keywords?.join(', ') || ''
-            }
-        };
-        setFormData(data);
-        setInitialState(data);
-        setCurrentProjectId(project.id);
-        setView('editor');
+        router.push(`/dashboard/projects?action=edit&id=${project.id}`);
     };
 
     const handleBackClick = () => {
-        if (isDirty()) {
-            setShowUnsavedAlert(true);
+        // Explicit back button click handler
+        if (JSON.stringify(formData) !== JSON.stringify(initialState)) {
+            setShowExitAlert(true);
         } else {
-            setView('list');
+            router.back();
         }
+    };
+
+    const confirmExit = () => {
+        setShowExitAlert(false);
+        setIsDirty(false);
+        router.back();
     };
 
     const handleSave = async () => {
@@ -147,8 +173,9 @@ export default function ProjectsPage() {
             });
 
             showToast('Project saved successfully!', 'success');
+            setIsDirty(false); // Clear dirty state
+            router.back();
             fetchInitialData();
-            setInitialState(formData);
             return true;
         } catch (error: any) {
             showToast(error.message || 'Failed to save project.', 'error');
@@ -158,19 +185,36 @@ export default function ProjectsPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this project?')) return;
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; projectId: string | null }>({
+        isOpen: false,
+        projectId: null
+    });
+
+    const handleDeleteClick = (id: string) => {
+        setDeleteConfirmation({ isOpen: true, projectId: id });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteConfirmation.projectId) return;
 
         try {
-            await apiRequest(`/projects/${id}`, {
+            await apiRequest(`/projects/${deleteConfirmation.projectId}`, {
                 method: 'DELETE',
                 skipNotification: true
             });
             showToast('Project deleted successfully!', 'success');
             fetchInitialData();
+            setDeleteConfirmation({ isOpen: false, projectId: null });
         } catch (error: any) {
             showToast(error.message || 'Failed to delete project.', 'error');
+            // Keep dialog open or close it? usually close on error or show error.
+            // Let's close it to avoid stuck state, toast explains error.
+            setDeleteConfirmation({ isOpen: false, projectId: null });
         }
+    };
+
+    const cancelDelete = () => {
+        setDeleteConfirmation({ isOpen: false, projectId: null });
     };
 
     const removeGalleryImage = (index: number) => {
@@ -181,21 +225,23 @@ export default function ProjectsPage() {
     };
 
     useEffect(() => {
-        setShowUnsavedAlert(false);
+        // No-op for view change side effects if any, or just clean up
     }, [view]);
 
     if (view === 'editor') {
         return (
             <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                 <UnsavedChangesAlert
-                    isOpen={showUnsavedAlert}
-                    onSaveAndExit={async () => {
-                        const success = await handleSave();
-                        if (success) setView('list');
-                    }}
-                    onDiscardAndExit={() => setView('list')}
-                    onCancel={() => setShowUnsavedAlert(false)}
-                    isSaving={isSaving}
+                    isOpen={showExitAlert}
+                    title="Unsaved Changes"
+                    description="You have unsaved changes. Are you sure you want to leave? Your changes will be lost."
+                    confirmLabel="Save & Exit"
+                    secondaryLabel="Discard & Leave"
+                    cancelLabel="Keep Editing"
+                    onSaveAndExit={() => handleSave()}
+                    onDiscardAndExit={confirmExit}
+                    onCancel={() => setShowExitAlert(false)}
+                    variant="success"
                 />
 
                 {/* Editor Header */}
@@ -228,7 +274,7 @@ export default function ProjectsPage() {
                             <option value="IN_PROGRESS">In Progress</option>
                             <option value="CONCEPT">Concept</option>
                         </select>
-                        <button onClick={() => handleSave()} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95">
+                        <button onClick={() => handleSave()} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
                             <CloudArrowUpIcon className="h-4 w-4" />
                             {isSaving ? 'Saving...' : 'Save Changes'}
                         </button>
@@ -365,14 +411,28 @@ export default function ProjectsPage() {
 
                         {/* Hero Video / Media */}
                         <div className="bg-white rounded-2xl p-6 border border-slate-200/50 shadow-sm space-y-4">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Hero Video (35% Slot)</h3>
-                            <input
-                                type="text"
-                                value={formData.heroVideo}
-                                onChange={(e) => setFormData({ ...formData, heroVideo: e.target.value })}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/10"
-                                placeholder="Video URL (e.g. Vimeo/YouTube/MP4)"
-                            />
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Hero Video (35% Slot)</h3>
+                                {formData.heroVideo && (
+                                    <button onClick={() => setFormData({ ...formData, heroVideo: '' })} className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:text-red-600 transition-colors">Remove</button>
+                                )}
+                            </div>
+                            <div
+                                onClick={() => {
+                                    setMediaTarget('heroVideo');
+                                    setIsMediaOpen(true);
+                                }}
+                                className="aspect-[16/9] bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100/50 hover:border-blue-400 hover:text-blue-500 transition-all cursor-pointer group overflow-hidden relative"
+                            >
+                                {formData.heroVideo ? (
+                                    <video src={formData.heroVideo} className="w-full h-full object-cover" controls />
+                                ) : (
+                                    <>
+                                        <PhotoIcon className="h-8 w-8 mb-2 group-hover:scale-110 transition-transform" />
+                                        <span className="text-[10px] font-bold">Select Video</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         <MediaLibrary
@@ -383,6 +443,10 @@ export default function ProjectsPage() {
                                     setFormData({ ...formData, coverImage: url });
                                 } else if (mediaTarget === 'banner') {
                                     setFormData({ ...formData, bannerImage: url });
+                                } else if (mediaTarget === 'heroVideo') {
+                                    setFormData({ ...formData, heroVideo: url });
+                                } else if (mediaTarget === 'model3d') {
+                                    setFormData({ ...formData, model3dUrl: url });
                                 } else {
                                     setFormData({ ...formData, gallery: [...formData.gallery, url] });
                                 }
@@ -408,17 +472,34 @@ export default function ProjectsPage() {
 
                         {/* 3D Model */}
                         <div className="bg-white rounded-2xl p-6 border border-slate-200/50 shadow-sm space-y-4">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <CubeIcon className="h-4 w-4" />
-                                3D Model URL
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <CubeIcon className="h-4 w-4" />
+                                    3D Model URL
+                                </span>
+                                {formData.model3dUrl && (
+                                    <button onClick={() => setFormData({ ...formData, model3dUrl: '' })} className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:text-red-600 transition-colors">Remove</button>
+                                )}
                             </h3>
-                            <input
-                                type="text"
-                                value={formData.model3dUrl}
-                                onChange={(e) => setFormData({ ...formData, model3dUrl: e.target.value })}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/10"
-                                placeholder="https://example.com/model.glb"
-                            />
+                            <div
+                                onClick={() => {
+                                    setMediaTarget('model3d');
+                                    setIsMediaOpen(true);
+                                }}
+                                className="h-24 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100/50 hover:border-blue-400 hover:text-blue-500 transition-all cursor-pointer group overflow-hidden relative"
+                            >
+                                {formData.model3dUrl ? (
+                                    <div className="flex items-center gap-2 text-blue-600">
+                                        <CubeIcon className="h-6 w-6" />
+                                        <span className="text-xs font-bold truncate max-w-[200px]">{formData.model3dUrl.split('/').pop()}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <CubeIcon className="h-6 w-6 mb-1 group-hover:scale-110 transition-transform" />
+                                        <span className="text-[10px] font-bold">Select 3D Model</span>
+                                    </>
+                                )}
+                            </div>
                         </div>
 
                         {/* Client & Location */}
@@ -507,12 +588,12 @@ export default function ProjectsPage() {
                     <p className="mt-1 text-xs text-slate-500 font-semibold tracking-tight">Manage your architectural projects and showcase your work.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {canManageContent && (
-                        <button onClick={handleCreate} className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none">
+                    <PermissionGuard permission="content_create">
+                        <button onClick={handleCreate} className="inline-flex items-center gap-x-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 leading-none">
                             <PlusIcon className="h-4 w-4" strokeWidth={3} />
                             New Project
                         </button>
-                    )}
+                    </PermissionGuard>
                 </div>
             </div>
 
@@ -616,7 +697,7 @@ export default function ProjectsPage() {
                                                         <button onClick={() => handleEdit(project)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all">
                                                             <PencilSquareIcon className="h-4 w-4" />
                                                         </button>
-                                                        <button onClick={() => handleDelete(project.id)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
+                                                        <button onClick={() => handleDeleteClick(project.id)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
                                                             <TrashIcon className="h-4 w-4" />
                                                         </button>
                                                     </div>
@@ -629,6 +710,30 @@ export default function ProjectsPage() {
                     </table>
                 </div>
             </div>
-        </div>
+
+
+            <AlertDialog
+                isOpen={deleteConfirmation.isOpen}
+                title="Delete Project"
+                description="Are you sure you want to delete this project? This action cannot be undone."
+                confirmLabel="Delete Project"
+                cancelLabel="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={cancelDelete}
+            />
+        </div >
+    );
+}
+
+export default function ProjectsPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        }>
+            <ProjectsPageContent />
+        </Suspense>
     );
 }

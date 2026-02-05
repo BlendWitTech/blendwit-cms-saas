@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
     ShieldCheckIcon,
     PlusIcon,
@@ -38,30 +38,29 @@ import {
     FingerPrintIcon,
     ChartBarIcon
 } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import { useNotification } from '@/context/NotificationContext';
+import { apiRequest } from '@/lib/api';
+import RoleForm from '@/components/roles/RoleForm';
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ');
 }
 
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import ConfirmationModal from '@/components/ui/ConfirmationModal';
-import { useNotification } from '@/context/NotificationContext';
-
-export default function RolesPage() {
+function RolesPageContent() {
     const { showToast } = useNotification();
-    const [roles, setRoles] = useState<any[]>([]);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [isLoading, setIsLoading] = useState(true);
-
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    useEffect(() => {
-        if (searchParams.get('action') === 'new') {
-            router.replace('/dashboard/roles/create');
-        }
-    }, [searchParams]);
+    // Derived state
+    const view = searchParams.get('action') === 'new' || searchParams.get('action') === 'edit' ? 'editor' : 'list';
+    const actionId = searchParams.get('id');
+
+    const [roles, setRoles] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [isLoading, setIsLoading] = useState(true);
 
     const [confirmModal, setConfirmModal] = useState<{
         isOpen: boolean;
@@ -110,25 +109,8 @@ export default function RolesPage() {
 
     const fetchRoles = async () => {
         setIsLoading(true);
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/login';
-            return;
-        }
         try {
-            const response = await fetch('http://localhost:3001/roles', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (!response.ok) {
-                if (response.status === 401) {
-                    window.location.href = '/login';
-                    return;
-                }
-                throw new Error('Failed to fetch');
-            }
-            const data = await response.json();
+            const data = await apiRequest('/roles');
             if (Array.isArray(data)) {
                 setRoles(data);
             } else {
@@ -136,6 +118,7 @@ export default function RolesPage() {
             }
         } catch (error) {
             console.error('Failed to fetch roles:', error);
+            showToast('Failed to load roles', 'error');
             setRoles([]);
         } finally {
             setIsLoading(false);
@@ -147,15 +130,13 @@ export default function RolesPage() {
     }, []);
 
     const deleteRoleAPI = async (id: string) => {
-        const token = localStorage.getItem('token');
         try {
-            await fetch(`http://localhost:3001/roles/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await apiRequest(`/roles/${id}`, { method: 'DELETE' });
+            showToast('Role deleted successfully', 'success');
             fetchRoles();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to delete role:', error);
+            showToast(error.message || 'Failed to delete role', 'error');
         }
     };
 
@@ -183,6 +164,34 @@ export default function RolesPage() {
                 setConfirmModal(prev => ({ ...prev, isOpen: false }));
             }
         });
+    };
+
+    const handleSave = async (data: any) => {
+        try {
+            const url = actionId ? `/roles/${actionId}` : '/roles';
+            const method = actionId ? 'PATCH' : 'POST';
+
+            await apiRequest(url, {
+                method,
+                body: data,
+                skipNotification: true
+            });
+
+            showToast(`Role ${actionId ? 'updated' : 'created'} successfully`, 'success');
+            router.push('/dashboard/roles');
+            fetchRoles();
+        } catch (error: any) {
+            showToast(error.message || `Failed to ${actionId ? 'update' : 'create'} role`, 'error');
+            throw error;
+        }
+    };
+
+    const handleCreate = () => {
+        router.push('/dashboard/roles?action=new');
+    };
+
+    const handleEdit = (role: any) => {
+        router.push(`/dashboard/roles?action=edit&id=${role.id}`);
     };
 
     const permissionIcons = [
@@ -242,8 +251,25 @@ export default function RolesPage() {
         );
     };
 
+    if (view === 'editor') {
+        const currentRole = actionId ? roles.find(r => r.id === actionId) : null;
+
+        // If editing but role not found (and not loading), redirect or show error?
+        // Ideally we might want to fetch the specific role if not in list, but for now we rely on list being loaded or list load.
+        // Actually, RoleForm handles initialData. If we are in edit mode, pass initialData.
+
+        return (
+            <RoleForm
+                title={actionId ? "Edit Role" : "Create New Role"}
+                subtitle={actionId ? `Edit permissions for ${currentRole?.name || 'role'}` : "Define a new role and its permissions."}
+                initialData={currentRole}
+                onSave={handleSave}
+            />
+        );
+    }
+
     return (
-        <div className="space-y-8 pb-20">
+        <div className="space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <ConfirmationModal
                 isOpen={confirmModal.isOpen}
                 onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
@@ -287,13 +313,13 @@ export default function RolesPage() {
                         </button>
                     </div>
 
-                    <Link
-                        href="/dashboard/roles/create"
+                    <button
+                        onClick={handleCreate}
                         className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none"
                     >
                         <PlusIcon className="h-4 w-4" strokeWidth={3} />
                         New Role
-                    </Link>
+                    </button>
                 </div>
             </div>
 
@@ -320,12 +346,12 @@ export default function RolesPage() {
                                             <RoleIcon className="h-6 w-6" />
                                         </div>
                                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 relative z-10">
-                                            <Link
-                                                href={`/dashboard/roles/${role.id}`}
+                                            <button
+                                                onClick={() => handleEdit(role)}
                                                 className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
                                             >
                                                 <PencilSquareIcon className="h-4 w-4" />
-                                            </Link>
+                                            </button>
                                             {!isSystemRole && (
                                                 <button
                                                     onClick={() => handleDelete(role.id)}
@@ -420,13 +446,13 @@ export default function RolesPage() {
                                             </td>
                                             <td className="pr-8 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Link
-                                                        href={`/dashboard/roles/${role.id}`}
+                                                    <button
+                                                        onClick={() => handleEdit(role)}
                                                         className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                                                         title="Edit Role"
                                                     >
                                                         <PencilSquareIcon className="h-4 w-4" />
-                                                    </Link>
+                                                    </button>
                                                     {!isSystemRole && (
                                                         <button
                                                             onClick={() => handleDelete(role.id)}
@@ -444,14 +470,21 @@ export default function RolesPage() {
                             </tbody>
                         </table>
                     </div>
-                    {roles.length === 0 && !isLoading && (
-                        <div className="p-12 text-center text-slate-400">
-                            <p className="text-sm font-bold">No roles found.</p>
-                        </div>
-                    )}
                 </div>
             )
             }
         </div>
+    );
+}
+
+export default function RolesPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        }>
+            <RolesPageContent />
+        </Suspense>
     );
 }

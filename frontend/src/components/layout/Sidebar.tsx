@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     HomeIcon,
     DocumentTextIcon,
@@ -21,6 +21,8 @@ import { apiRequest } from '@/lib/api';
 import { useSettings } from '@/context/SettingsContext';
 import { usePermissions } from '@/context/PermissionsContext';
 import { getVisibleNavItems, checkPermission } from '@/lib/permissions';
+import { useForm } from '@/context/FormContext';
+import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 
 const initialNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon }, // No permission required
@@ -94,7 +96,7 @@ function classNames(...classes: string[]) {
 }
 
 // Recursive Sidebar Item Component
-const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0 }: any) => {
+const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0, onNavigate }: any) => {
     const [isOpen, setIsOpen] = useState(false);
     const hasChildren = item.children && item.children.length > 0;
 
@@ -109,6 +111,12 @@ const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0 }: any) 
     }, [pathname, hasChildren, item.children]);
 
     const toggleOpen = () => setIsOpen(!isOpen);
+
+    const handleClick = (e: React.MouseEvent, href: string) => {
+        if (!href || href === '#') return;
+        e.preventDefault();
+        onNavigate(href);
+    };
 
     // If level > 0 (nested), render simpler link
     if (level > 0) {
@@ -135,6 +143,7 @@ const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0 }: any) 
                                     isActive={child.href === pathname}
                                     pathname={pathname}
                                     level={level + 1}
+                                    onNavigate={onNavigate}
                                 />
                             ))}
                         </ul>
@@ -144,15 +153,16 @@ const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0 }: any) 
         }
         return (
             <li>
-                <Link
+                <a
                     href={item.href || '#'}
+                    onClick={(e) => handleClick(e, item.href)}
                     className={classNames(
                         pathname === item.href ? 'text-blue-600 font-bold bg-blue-50/50' : 'text-slate-500 hover:text-slate-900',
-                        'block rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ml-1'
+                        'block rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ml-1 cursor-pointer'
                     )}
                 >
                     {item.name}
-                </Link>
+                </a>
             </li>
         );
     }
@@ -204,19 +214,21 @@ const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0 }: any) 
                                     isActive={child.href === pathname}
                                     pathname={pathname}
                                     level={level + 1}
+                                    onNavigate={onNavigate}
                                 />
                             ))}
                         </ul>
                     )}
                 </>
             ) : (
-                <Link
+                <a
                     href={item.href || '#'}
+                    onClick={(e) => handleClick(e, item.href)}
                     className={classNames(
                         isActive
                             ? 'text-blue-600 bg-blue-50/50'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80',
-                        'group flex items-center gap-x-3 rounded-xl p-2.5 text-sm font-bold transition-all duration-300 ease-out relative overflow-hidden',
+                        'group flex items-center gap-x-3 rounded-xl p-2.5 text-sm font-bold transition-all duration-300 ease-out relative overflow-hidden cursor-pointer',
                         isCollapsed ? 'justify-center' : ''
                     )}
                 >
@@ -235,7 +247,7 @@ const SidebarItem = ({ item, isCollapsed, isActive, pathname, level = 0 }: any) 
                     {!isCollapsed && (
                         <span className="animate-in fade-in duration-500 font-bold">{item.name}</span>
                     )}
-                </Link>
+                </a>
             )}
         </li>
     );
@@ -248,8 +260,12 @@ interface SidebarProps {
 
 export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { permissions, isLoading: permissionsLoading } = usePermissions();
     const [navItems, setNavItems] = useState(initialNavigation);
+    const { isDirty, setIsDirty, saveHandler } = useForm();
+    const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+    const [showDiscardAlert, setShowDiscardAlert] = useState(false);
 
     // Filter navigation based on permissions
     useEffect(() => {
@@ -289,9 +305,24 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                             ...item,
                             children: item.children?.map((subItem: any) => {
                                 if (subItem.name === 'Static Pages') {
+                                    // Filter out pages that collide with dynamic system pages or shouldn't be edited here
+                                    const filteredPages = pages.filter((page: any) => {
+                                        const systemSlugs = [
+                                            'blog', 'blogs', 'blog-list', 'blog-details',
+                                            'project', 'projects', 'project-list', 'project-details',
+                                            'category', 'categories', 'tag', 'tags',
+                                            'search', '404', '500'
+                                        ];
+                                        const lowerTitle = page.title?.toLowerCase() || '';
+                                        // Filter by slug or title if it looks like a system category page
+                                        return !systemSlugs.includes(page.slug) &&
+                                            !lowerTitle.includes('category') &&
+                                            !lowerTitle.includes('tag archive');
+                                    });
+
                                     return {
                                         ...subItem,
-                                        children: pages.map((page: any) => ({
+                                        children: filteredPages.map((page: any) => ({
                                             name: page.title,
                                             href: `/dashboard/pages/${page.id}` // Use ID for editing
                                         }))
@@ -334,8 +365,60 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
     const { settings } = useSettings();
 
+    const handleNavigation = (href: string) => {
+        if (href === pathname || href === '#') return;
+
+        if (isDirty) {
+            setPendingNavigation(href);
+            setShowDiscardAlert(true);
+        } else {
+            router.push(href);
+        }
+    };
+
+    const confirmNavigation = () => {
+        setIsDirty(false); // Reset dirty state
+        setShowDiscardAlert(false);
+        if (pendingNavigation) {
+            router.push(pendingNavigation);
+            setPendingNavigation(null);
+        }
+    };
+
+    const cancelNavigation = () => {
+        setShowDiscardAlert(false);
+        setPendingNavigation(null);
+    };
+
+
+
+    const handleSaveAndExit = async () => {
+        if (saveHandler) {
+            try {
+                await saveHandler();
+                confirmNavigation(); // Proceed after successful save
+            } catch (error) {
+                // Save failed, stay
+                setShowDiscardAlert(false);
+            }
+        }
+    };
+
     return (
         <div className="relative flex grow flex-col border-r border-slate-200/40 bg-white/70 backdrop-blur-3xl transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-[1px_0_10px_rgba(0,0,0,0.02)] isolate">
+            <UnsavedChangesAlert
+                isOpen={showDiscardAlert}
+                onSaveAndExit={saveHandler ? handleSaveAndExit : undefined}
+                onDiscardAndExit={confirmNavigation}
+                onCancel={cancelNavigation}
+                title="Unsaved Changes" // Changed from Discard Changes? to be more generic
+                description="You have unsaved changes. What would you like to do?"
+                confirmLabel={saveHandler ? "Save & Exit" : undefined}
+                secondaryLabel="Discard & Leave"
+                cancelLabel="Keep Editing"
+                variant={saveHandler ? "success" : "danger"} // Info if save possible, danger if discard only
+            />
+
             {/* Informative Floating Toggle Button */}
             <div className="fixed lg:absolute -right-3 top-8 z-[100] group/toggle">
                 <button
@@ -395,6 +478,7 @@ export default function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                                             ))
                                         }
                                         pathname={pathname}
+                                        onNavigate={handleNavigation}
                                     />
                                 ))}
                             </ul>

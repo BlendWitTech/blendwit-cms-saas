@@ -5,49 +5,48 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { Permission } from '../auth/permissions.enum';
 
-@UseGuards(PermissionsGuard)
 @Controller('services')
 export class ServicesController {
     constructor(private readonly servicesService: ServicesService) { }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_CREATE)
     @Post()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_CREATE)
     create(@Body() createServiceDto: any) {
         return this.servicesService.create(createServiceDto);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_VIEW)
     @Get()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_VIEW)
     findAll() {
         return this.servicesService.findAll();
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_VIEW)
     @Get(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_VIEW)
     findOne(@Param('id') id: string) {
         return this.servicesService.findOne(id);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_EDIT)
     @Patch(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_EDIT)
     update(@Param('id') id: string, @Body() updateServiceDto: any) {
         return this.servicesService.update(id, updateServiceDto);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_DELETE)
     @Delete(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_DELETE)
     remove(@Param('id') id: string) {
         return this.servicesService.remove(id);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_EDIT)
     @Post('reorder')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_EDIT)
     reorder(@Body() updates: Array<{ id: string; order: number }>) {
         return this.servicesService.reorder(updates);
     }

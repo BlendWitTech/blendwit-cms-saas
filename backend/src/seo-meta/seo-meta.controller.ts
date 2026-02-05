@@ -14,6 +14,16 @@ export class SeoMetaController {
         private readonly auditLog: AuditLogService,
     ) { }
 
+    @Get('stats')
+    async getStats() {
+        return this.seoMetaService.getDashboardStats();
+    }
+
+    @Get('content-list')
+    async getContentList() {
+        return this.seoMetaService.getContentList();
+    }
+
     @Get(':pageType')
     async findByPageType(@Param('pageType') pageType: string) {
         return this.seoMetaService.findByPage(pageType);
@@ -33,7 +43,7 @@ export class SeoMetaController {
     async upsert(@Body() data: any, @Request() req) {
         const result = await this.seoMetaService.upsert(data);
         await this.auditLog.log(
-            req.user.userId,
+            req.user.id,
             'SEO_META_UPDATE',
             { pageType: data.pageType, pageId: data.pageId },
         );
@@ -45,7 +55,7 @@ export class SeoMetaController {
     @Delete(':id')
     async delete(@Param('id') id: string, @Request() req) {
         const result = await this.seoMetaService.delete(id);
-        await this.auditLog.log(req.user.userId, 'SEO_META_DELETE', { id });
+        await this.auditLog.log(req.user.id, 'SEO_META_DELETE', { id });
         return result;
     }
 

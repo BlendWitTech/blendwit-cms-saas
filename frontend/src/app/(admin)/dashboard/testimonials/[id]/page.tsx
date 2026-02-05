@@ -13,6 +13,7 @@ import {
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { apiRequest } from '@/lib/api';
 import { useNotification } from '@/context/NotificationContext';
+import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 
 interface TestimonialFormData {
     clientName: string;
@@ -26,9 +27,10 @@ export default function EditTestimonialPage({ params }: { params: Promise<{ id: 
     const { id } = use(params);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
     const { showToast } = useNotification();
     const router = useRouter();
-    const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<TestimonialFormData>({
+    const { register, handleSubmit, watch, reset, setValue, formState: { errors, isDirty } } = useForm<TestimonialFormData>({
         defaultValues: {
             rating: 5
         }
@@ -45,11 +47,13 @@ export default function EditTestimonialPage({ params }: { params: Promise<{ id: 
             setIsLoading(true);
             const data = await apiRequest(`/testimonials/${id}`);
             if (data) {
-                setValue('clientName', data.clientName);
-                setValue('clientRole', data.clientRole || '');
-                setValue('content', data.content);
-                setValue('rating', data.rating || 5);
-                setValue('image', data.image || '');
+                reset({
+                    clientName: data.clientName,
+                    clientRole: data.clientRole || '',
+                    content: data.content,
+                    rating: data.rating || 5,
+                    image: data.image || ''
+                });
             }
         } catch (error) {
             console.error('Failed to fetch testimonial:', error);
@@ -57,6 +61,14 @@ export default function EditTestimonialPage({ params }: { params: Promise<{ id: 
             router.push('/dashboard/testimonials');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleBack = () => {
+        if (isDirty) {
+            setShowUnsavedAlert(true);
+        } else {
+            router.back();
         }
     };
 
@@ -71,10 +83,14 @@ export default function EditTestimonialPage({ params }: { params: Promise<{ id: 
                 })
             });
             showToast('Testimonial updated successfully', 'success');
+            // Reset to prevent unsaved alert
+            reset(data);
             router.push('/dashboard/testimonials');
+            return true;
         } catch (error) {
             console.error('Failed to update testimonial:', error);
             showToast('Failed to update testimonial', 'error');
+            return false;
         } finally {
             setIsSubmitting(false);
         }
@@ -90,14 +106,27 @@ export default function EditTestimonialPage({ params }: { params: Promise<{ id: 
 
     return (
         <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <UnsavedChangesAlert
+                isOpen={showUnsavedAlert}
+                onSaveAndExit={async () => {
+                    await handleSubmit(async (data) => {
+                        const success = await onSubmit(data);
+                        if (success) router.back();
+                    })();
+                }}
+                onDiscardAndExit={() => router.back()}
+                onCancel={() => setShowUnsavedAlert(false)}
+                isSaving={isSubmitting}
+            />
+
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link
-                    href="/dashboard/testimonials"
+                <button
+                    onClick={handleBack}
                     className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm hover:shadow-md"
                 >
                     <ArrowLeftIcon className="h-5 w-5" />
-                </Link>
+                </button>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-display">
                         Edit <span className="text-blue-600">Testimonial</span>

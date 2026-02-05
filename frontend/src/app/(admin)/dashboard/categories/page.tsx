@@ -151,7 +151,7 @@ export default function CategoriesPage() {
             {isModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={handleCloseAttempt} />
-                    <div className="relative bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                    <div className="relative bg-white rounded-2xl w-full max-w-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-300">
                         <h2 className="text-xl font-bold mb-6">
                             {editingCategory ? 'Edit' : 'New'} {activeTab === 'blog' ? 'Blog' : 'Project'} Category
                         </h2>

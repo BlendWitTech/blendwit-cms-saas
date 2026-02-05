@@ -619,7 +619,7 @@ export default function SettingsPage() {
                                             </td>
                                             <td className="px-6 py-6">
                                                 <p className="text-[10px] font-mono font-bold text-slate-400 truncate max-w-[200px]" title={JSON.stringify(log.metadata)}>
-                                                    {JSON.stringify(log.metadata)}
+                                                    body: settings,.metadata)
                                                 </p>
                                             </td>
                                             <td className="pr-10 py-6 text-right font-display italic">

@@ -27,13 +27,8 @@ export default function SEODashboard() {
 
     const fetchStats = async () => {
         try {
-            // Mock data for now - will integrate with real API
-            setStats({
-                totalPosts: 24,
-                postsWithSeo: 18,
-                redirects: 5,
-                sitemapLastGenerated: new Date(),
-            });
+            const data = await apiRequest('/seo-meta/stats');
+            setStats(data);
         } catch (error) {
             console.error('Failed to fetch SEO stats', error);
         }

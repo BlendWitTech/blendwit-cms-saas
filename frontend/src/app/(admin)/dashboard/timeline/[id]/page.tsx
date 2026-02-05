@@ -59,10 +59,14 @@ export default function EditMilestonePage({ params }: { params: Promise<{ id: st
         try {
             await apiRequest(`/timeline/${id}`, {
                 method: 'PATCH',
-                body: JSON.stringify({
-                    ...data,
+                body: {
+                    title: data.title,
+                    year: data.year,
+                    description: data.description,
+                    icon: data.icon,
+                    image: data.image,
                     order: Number(data.order)
-                })
+                }
             });
             showToast('Milestone updated successfully', 'success');
             router.push('/dashboard/timeline');

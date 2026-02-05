@@ -4,12 +4,16 @@ import { useEffect } from 'react';
 import Script from 'next/script';
 
 export default function AnalyticsScripts({ config }: { config?: any }) {
-    const ga4Id = config?.ga4Id || process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID;
-    const fbPixelId = config?.fbPixelId || process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+    const ga4Id = config?.ga4MeasurementId || config?.ga4Id || process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID;
+    const fbPixelId = config?.fbPixelId || config?.fbId || process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+    const isActive = config?.isActive !== false; // Default to true if not explicitly false
 
     useEffect(() => {
+        if (!isActive) return;
+
         // Initialize Facebook Pixel if ID is provided
         if (fbPixelId && typeof window !== 'undefined') {
+            console.log(`[Analytics] Initializing Facebook Pixel: ${fbPixelId}`);
             (window as any).fbq = function (...args: any[]) {
                 if ((window as any).fbq.callMethod) {
                     (window as any).fbq.callMethod.apply((window as any).fbq, args);
@@ -27,7 +31,13 @@ export default function AnalyticsScripts({ config }: { config?: any }) {
             (window as any).fbq('init', fbPixelId);
             (window as any).fbq('track', 'PageView');
         }
-    }, [fbPixelId]);
+
+        if (ga4Id) {
+            console.log(`[Analytics] Initializing GA4: ${ga4Id}`);
+        }
+    }, [fbPixelId, ga4Id, isActive]);
+
+    if (!isActive) return null;
 
     return (
         <>

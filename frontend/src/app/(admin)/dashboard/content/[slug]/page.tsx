@@ -12,6 +12,7 @@ import {
     ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useNotification } from '@/context/NotificationContext';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
 
 export default function CollectionContentPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
@@ -20,6 +21,9 @@ export default function CollectionContentPage({ params }: { params: Promise<{ sl
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const { showToast } = useNotification();
+
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -62,13 +66,20 @@ export default function CollectionContentPage({ params }: { params: Promise<{ sl
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this item?')) return;
+    const confirmDelete = (id: string) => {
+        setItemToDelete(id);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDelete = async () => {
+        if (!itemToDelete) return;
 
         try {
-            await apiRequest(`/content-items/${id}`, { method: 'DELETE' });
+            await apiRequest(`/content-items/${itemToDelete}`, { method: 'DELETE' });
             showToast('Item deleted successfully', 'success');
-            setItems(items.filter(item => item.id !== id));
+            setItems(items.filter(item => item.id !== itemToDelete));
+            setIsDeleteModalOpen(false);
+            setItemToDelete(null);
         } catch (error) {
             showToast('Failed to delete item', 'error');
         }
@@ -82,6 +93,16 @@ export default function CollectionContentPage({ params }: { params: Promise<{ sl
 
     return (
         <div className="space-y-6">
+            <ConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleDelete}
+                title="Delete Entry"
+                message="Are you sure you want to delete this entry? This action cannot be undone."
+                confirmText="Delete Entry"
+                variant="danger"
+            />
+
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">
                 <div className="flex items-center gap-4">
                     <Link href="/dashboard/collections" className="p-2 hover:bg-slate-50 rounded-xl text-slate-500 transition-colors">
@@ -187,7 +208,7 @@ export default function CollectionContentPage({ params }: { params: Promise<{ sl
                                                         <PencilSquareIcon className="h-4 w-4" />
                                                     </Link>
                                                     <button
-                                                        onClick={() => handleDelete(item.id)}
+                                                        onClick={() => confirmDelete(item.id)}
                                                         className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
                                                     >
                                                         <TrashIcon className="h-4 w-4" />

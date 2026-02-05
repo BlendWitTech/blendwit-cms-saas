@@ -21,6 +21,7 @@ import {
 import { useNotification } from '@/context/NotificationContext';
 import PostEditor from '@/components/blog/PostEditor';
 import MediaLibrary from '@/components/media/MediaLibrary';
+import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 
 function ContentEditorContent({ params }: { params: Promise<{ slug: string, itemId: string }> }) {
     const router = useRouter();
@@ -35,6 +36,9 @@ function ContentEditorContent({ params }: { params: Promise<{ slug: string, item
 
     const [isMediaOpen, setIsMediaOpen] = useState(false);
     const [activeMediaField, setActiveMediaField] = useState<string | null>(null);
+
+    const [initialState, setInitialState] = useState<any>(null);
+    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
 
     const { showToast } = useNotification();
 
@@ -67,14 +71,30 @@ function ContentEditorContent({ params }: { params: Promise<{ slug: string, item
                 const item = await apiRequest(`/content-items/${itemId}`);
                 setFormData(item.data);
                 setIsPublished(item.isPublished);
+                setInitialState({ data: item.data, isPublished: item.isPublished });
             } else {
                 setFormData(defaults);
+                setInitialState({ data: defaults, isPublished: true });
             }
         } catch (error) {
             console.error(error);
             showToast('Failed to load item', 'error');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const isDirty = () => {
+        if (!initialState) return false;
+        const current = { data: formData, isPublished };
+        return JSON.stringify(current) !== JSON.stringify(initialState);
+    };
+
+    const handleBack = () => {
+        if (isDirty()) {
+            setShowUnsavedAlert(true);
+        } else {
+            router.back();
         }
     };
 
@@ -95,9 +115,12 @@ function ContentEditorContent({ params }: { params: Promise<{ slug: string, item
                 await apiRequest(`/content-items/${itemId}`, { method: 'PATCH', body: payload });
                 showToast('Entry updated successfully', 'success');
             }
-            router.push(`/dashboard/content/${slug}`);
+            // Update initial state
+            setInitialState({ data: formData, isPublished });
+            return true;
         } catch (error: any) {
             showToast(error.message || 'Failed to save entry', 'error');
+            return false;
         } finally {
             setIsSaving(false);
         }
@@ -117,10 +140,21 @@ function ContentEditorContent({ params }: { params: Promise<{ slug: string, item
 
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-20">
+            <UnsavedChangesAlert
+                isOpen={showUnsavedAlert}
+                onSaveAndExit={async () => {
+                    const success = await handleSave();
+                    if (success) router.back();
+                }}
+                onDiscardAndExit={() => router.back()}
+                onCancel={() => setShowUnsavedAlert(false)}
+                isSaving={isSaving}
+            />
+
             {/* Header */}
             <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200/50 shadow-sm sticky top-4 z-20">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="p-2 hover:bg-slate-50 rounded-xl text-slate-500 transition-colors">
+                    <button onClick={handleBack} className="p-2 hover:bg-slate-50 rounded-xl text-slate-500 transition-colors">
                         <ArrowLeftIcon className="h-5 w-5" />
                     </button>
                     <div>
@@ -138,7 +172,7 @@ function ContentEditorContent({ params }: { params: Promise<{ slug: string, item
                         <option value="false">Draft</option>
                     </select>
                     <button
-                        onClick={handleSave}
+                        onClick={() => handleSave().then(success => { if (success) router.push(`/dashboard/content/${slug}`); })}
                         disabled={isSaving}
                         className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50"
                     >

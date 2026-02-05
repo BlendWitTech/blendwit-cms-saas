@@ -23,14 +23,33 @@ export class AnalyticsController {
     @Post('config')
     @RequirePermissions(Permission.SETTINGS_EDIT)
     async updateConfig(@Body() data: any, @Request() req) {
-        const result = await this.analyticsService.updateConfig(data);
-        await this.auditLog.log(req.user.userId, 'ANALYTICS_CONFIG_UPDATE', data);
-        return result;
+        try {
+            const result = await this.analyticsService.updateConfig(data);
+            await this.auditLog.log(req.user.id, 'ANALYTICS_CONFIG_UPDATE', data);
+            return result;
+        } catch (err) {
+            console.error('Error in AnalyticsController.updateConfig:', err);
+            throw err;
+        }
+    }
+
+    @Post('test')
+    @RequirePermissions(Permission.SETTINGS_EDIT)
+    async testConfig(@Body() data: any) {
+        return this.analyticsService.testConnection(data);
     }
 
     @Get('dashboard')
     @RequirePermissions(Permission.ANALYTICS_VIEW)
     async getDashboard() {
-        return this.analyticsService.getDashboardMetrics();
+        try {
+            return await this.analyticsService.getDashboardMetrics();
+        } catch (error) {
+            // We want to return the error message so the frontend can display it
+            // Instead of throwing 500, we might want to return a specific structure or
+            // just let the global exception filter handle it.
+            // But since we want the dashboard to show "Error loading data" with a specific reason:
+            throw error;
+        }
     }
 }

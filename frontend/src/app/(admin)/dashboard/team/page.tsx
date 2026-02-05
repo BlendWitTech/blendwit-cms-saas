@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
     PlusIcon,
     PencilSquareIcon,
@@ -8,15 +8,27 @@ import {
     ArrowLeftIcon,
     CloudArrowUpIcon,
     PhotoIcon,
-    UserGroupIcon,
-    ArrowsUpDownIcon
+    UserGroupIcon
 } from '@heroicons/react/24/outline';
+import { useSearchParams, useRouter } from 'next/navigation';
 import MediaLibrary from '@/components/media/MediaLibrary';
 import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
+import AlertDialog from '@/components/ui/AlertDialog';
 import { useNotification } from '@/context/NotificationContext';
+import { useForm } from '@/context/FormContext';
+import { apiRequest } from '@/lib/api';
 
-export default function TeamPage() {
-    const [view, setView] = useState<'list' | 'editor'>('list');
+function TeamPageContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const { showToast } = useNotification();
+    const { isDirty, setIsDirty } = useForm();
+
+    // View derived from URL
+    const action = searchParams.get('action');
+    const actionId = searchParams.get('id');
+    const view = action === 'new' || (action === 'edit' && actionId) ? 'editor' : 'list';
+
     const [team, setTeam] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [canManageContent, setCanManageContent] = useState(false);
@@ -36,24 +48,42 @@ export default function TeamPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
     const [isMediaOpen, setIsMediaOpen] = useState(false);
-    const { showToast } = useNotification();
 
     useEffect(() => {
         fetchInitialData();
     }, []);
 
+    // Effect to handle URL-based data loading for Edit mode
+    useEffect(() => {
+        if (view === 'editor' && action === 'edit' && actionId) {
+            // Find member in existing list or fetch if needed
+            const member = team.find(t => t.id === actionId);
+            if (member) {
+                populateForm(member);
+            } else if (!isLoading && team.length > 0) {
+                // If loaded but not found in list (maybe pagination later?), fetch individual
+                fetchMember(actionId);
+            }
+        } else if (view === 'editor' && action === 'new') {
+            // Reset for new
+            if (currentMemberId !== null) {
+                resetForm();
+            }
+        }
+    }, [view, action, actionId, team, isLoading]);
+
+    // Sync isDirty with FormContext
+    useEffect(() => {
+        const dirty = JSON.stringify(formData) !== JSON.stringify(initialState);
+        setIsDirty(dirty);
+    }, [formData, initialState, setIsDirty]);
+
     const fetchInitialData = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
         try {
-            const [teamRes, profileRes] = await Promise.all([
-                fetch('http://localhost:3001/team', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('http://localhost:3001/auth/profile', { headers: { 'Authorization': `Bearer ${token}` } })
+            const [teamData, profile] = await Promise.all([
+                apiRequest('/team'),
+                apiRequest('/auth/profile')
             ]);
-
-            const teamData = await teamRes.json();
-            const profile = await profileRes.json();
 
             setTeam(Array.isArray(teamData) ? teamData : []);
 
@@ -67,16 +97,17 @@ export default function TeamPage() {
         }
     };
 
-    const isDirty = () => JSON.stringify(formData) !== JSON.stringify(initialState);
-
-    const handleCreate = () => {
-        setFormData({ ...defaultFormData, order: team.length });
-        setInitialState({ ...defaultFormData, order: team.length });
-        setCurrentMemberId(null);
-        setView('editor');
+    const fetchMember = async (id: string) => {
+        try {
+            const member = await apiRequest(`/team/${id}`);
+            if (member) populateForm(member);
+        } catch (error) {
+            showToast('Failed to load team member', 'error');
+            router.push('/dashboard/team');
+        }
     };
 
-    const handleEdit = (member: any) => {
+    const populateForm = (member: any) => {
         const data = {
             name: member.name,
             role: member.role,
@@ -88,76 +119,87 @@ export default function TeamPage() {
         setFormData(data);
         setInitialState(data);
         setCurrentMemberId(member.id);
-        setView('editor');
+    };
+
+    const resetForm = () => {
+        const data = { ...defaultFormData, order: team.length };
+        setFormData(data);
+        setInitialState(data);
+        setCurrentMemberId(null);
+    };
+
+    const handleCreate = () => {
+        resetForm();
+        router.push('/dashboard/team?action=new');
+    };
+
+    const handleEdit = (member: any) => {
+        // Optimistically populate to avoid flicker before URL effect kicks in
+        populateForm(member);
+        router.push(`/dashboard/team?action=edit&id=${member.id}`);
     };
 
     const handleBackClick = () => {
-        if (isDirty()) {
+        if (isDirty) {
             setShowUnsavedAlert(true);
         } else {
-            setView('list');
+            router.push('/dashboard/team');
         }
     };
 
     const handleSave = async () => {
         setIsSaving(true);
-        const token = localStorage.getItem('token');
-        const url = currentMemberId
-            ? `http://localhost:3001/team/${currentMemberId}`
-            : 'http://localhost:3001/team';
+        const url = currentMemberId ? `/team/${currentMemberId}` : '/team';
         const method = currentMemberId ? 'PATCH' : 'POST';
 
         try {
-            const res = await fetch(url, {
+            await apiRequest(url, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
+                body: formData
             });
 
-            if (res.ok) {
-                showToast('Team member saved successfully!', 'success');
-                fetchInitialData();
-                setInitialState(formData);
-                return true;
-            } else {
-                showToast('Failed to save team member.', 'error');
-                return false;
-            }
+            showToast('Team member saved successfully!', 'success');
+            setIsDirty(false); // Clear dirty state immediately
+            fetchInitialData();
+            // Update initial state to match saved to prevent dirty check on redirect
+            setInitialState(formData);
+            router.push('/dashboard/team');
         } catch (error) {
             console.error(error);
-            return false;
+            // apiRequest handles toast for errors usually, but if not:
+            // showToast('Failed to save team member.', 'error');
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this team member?')) return;
+    const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; memberId: string | null }>({
+        isOpen: false,
+        memberId: null
+    });
 
-        const token = localStorage.getItem('token');
+    const handleDeleteClick = (id: string) => {
+        setDeleteConfirmation({ isOpen: true, memberId: id });
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteConfirmation.memberId) return;
+
         try {
-            const res = await fetch(`http://localhost:3001/team/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (res.ok) {
-                showToast('Team member deleted successfully!', 'success');
-                fetchInitialData();
-            } else {
-                showToast('Failed to delete team member.', 'error');
-            }
+            await apiRequest(`/team/${deleteConfirmation.memberId}`, { method: 'DELETE' });
+            showToast('Team member deleted successfully!', 'success');
+            fetchInitialData();
+            setDeleteConfirmation({ isOpen: false, memberId: null });
         } catch (error) {
             console.error(error);
+            showToast('Failed to delete team member', 'error');
+            setDeleteConfirmation({ isOpen: false, memberId: null });
         }
     };
 
-    useEffect(() => {
-        setShowUnsavedAlert(false);
-    }, [view]);
+    const cancelDelete = () => {
+        setDeleteConfirmation({ isOpen: false, memberId: null });
+    };
 
     if (view === 'editor') {
         return (
@@ -165,12 +207,16 @@ export default function TeamPage() {
                 <UnsavedChangesAlert
                     isOpen={showUnsavedAlert}
                     onSaveAndExit={async () => {
-                        const success = await handleSave();
-                        if (success) setView('list');
+                        await handleSave();
+                        // handleSave handles redirect
                     }}
-                    onDiscardAndExit={() => setView('list')}
+                    onDiscardAndExit={() => {
+                        setIsDirty(false);
+                        router.push('/dashboard/team');
+                    }}
                     onCancel={() => setShowUnsavedAlert(false)}
                     isSaving={isSaving}
+                    variant="success"
                 />
 
                 <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200/50 shadow-sm sticky top-4 z-10">
@@ -183,7 +229,7 @@ export default function TeamPage() {
                             <h1 className="text-xl font-bold text-slate-900 font-display">{formData.name || 'Untitled Member'}</h1>
                         </div>
                     </div>
-                    <button onClick={() => handleSave()} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95">
+                    <button onClick={() => handleSave()} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
                         <CloudArrowUpIcon className="h-4 w-4" />
                         {isSaving ? 'Saving...' : 'Save Changes'}
                     </button>
@@ -290,7 +336,7 @@ export default function TeamPage() {
                             <input
                                 type="number"
                                 value={formData.order}
-                                onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
+                                onChange={(e) => setFormData({ ...formData, order: e.target.value === '' ? '' : parseInt(e.target.value) })}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/10"
                             />
                             <p className="text-[10px] text-slate-400">Lower numbers appear first</p>
@@ -312,7 +358,7 @@ export default function TeamPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     {canManageContent && (
-                        <button onClick={handleCreate} className="inline-flex items-center gap-x-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 leading-none">
+                        <button onClick={handleCreate} className="inline-flex items-center gap-x-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-95 leading-none">
                             <PlusIcon className="h-4 w-4" strokeWidth={3} />
                             Add Member
                         </button>
@@ -372,7 +418,7 @@ export default function TeamPage() {
                                                     <button onClick={() => handleEdit(member)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all">
                                                         <PencilSquareIcon className="h-4 w-4" />
                                                     </button>
-                                                    <button onClick={() => handleDelete(member.id)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
+                                                    <button onClick={() => handleDeleteClick(member.id)} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all">
                                                         <TrashIcon className="h-4 w-4" />
                                                     </button>
                                                 </div>
@@ -385,6 +431,29 @@ export default function TeamPage() {
                     </table>
                 </div>
             </div>
+
+            <AlertDialog
+                isOpen={deleteConfirmation.isOpen}
+                title="Delete Team Member"
+                description="Are you sure you want to delete this team member? This action cannot be undone."
+                confirmLabel="Delete Member"
+                cancelLabel="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={cancelDelete}
+            />
         </div>
+    );
+}
+
+export default function TeamPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        }>
+            <TeamPageContent />
+        </Suspense>
     );
 }

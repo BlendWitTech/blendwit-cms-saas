@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SeoMetaService } from '../seo-meta/seo-meta.service';
 
@@ -6,24 +7,42 @@ import { SeoMetaService } from '../seo-meta/seo-meta.service';
 export class PagesService {
     constructor(
         private prisma: PrismaService,
-        private seoMetaService: SeoMetaService
+        private seoMetaService: SeoMetaService,
+        private notificationsService: NotificationsService
     ) { }
 
     async create(data: any) {
         const slug = data.slug || data.title.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
 
-        return this.prisma.page.create({
+        const page = await (this.prisma as any).page.create({
             data: {
                 ...data,
                 slug,
             },
         });
+
+        await this.notificationsService.create({
+            type: 'SUCCESS',
+            title: 'New Static Page',
+            message: `Static page "${page.title}" was created.`,
+            link: `/dashboard/pages?edit=${page.id}`,
+            targetRole: 'Admin'
+        });
+
+        return page;
     }
 
     async findAll() {
-        return this.prisma.page.findMany({
+        const pages = await (this.prisma as any).page.findMany({
             orderBy: { updatedAt: 'desc' },
         });
+
+        const pagesWithSeo = await Promise.all(pages.map(async (page: any) => {
+            const seo = await this.seoMetaService.findByPage('page', page.id);
+            return { ...page, seo };
+        }));
+
+        return pagesWithSeo;
     }
 
     async findById(idOrSlug: string) {
@@ -62,6 +81,8 @@ export class PagesService {
             if (existing) id = existing.id;
         }
 
+        console.log('Update Page Payload:', JSON.stringify(updatePageDto, null, 2));
+
         const { seo, ...pageData } = updatePageDto;
         const data: any = { ...pageData };
 
@@ -79,11 +100,29 @@ export class PagesService {
             });
         }
 
+        await this.notificationsService.create({
+            type: 'INFO',
+            title: 'Static Page Updated',
+            message: `Static page "${page.title}" was updated.`,
+            link: `/dashboard/pages?edit=${page.id}`,
+            targetRole: 'Admin'
+        });
+
         return page;
     }
 
     async remove(id: string) {
-        return this.prisma.page.delete({
+        const page = await (this.prisma as any).page.findUnique({ where: { id } });
+        if (page) {
+            await this.seoMetaService.deleteByPage('page', id);
+            await this.notificationsService.create({
+                type: 'DANGER',
+                title: 'Static Page Deleted',
+                message: `Static page "${page.title}" was deleted.`,
+                targetRole: 'Admin'
+            });
+        }
+        return (this.prisma as any).page.delete({
             where: { id },
         });
     }

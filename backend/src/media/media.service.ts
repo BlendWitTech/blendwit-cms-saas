@@ -253,6 +253,18 @@ export class MediaService {
                     duration: duration
                 };
             }
+        } else {
+            // Default handler for raw files (3D models, docs, etc.)
+            finalFilename = file.filename;
+            finalUrl = `/uploads/${finalFilename}`;
+
+            if (useCloudinary) {
+                finalUrl = await this.uploadToCloud(file.path, 'cms_uploads', 'raw');
+                try { fs.unlinkSync(file.path); } catch (e) { }
+            } else if (s3Config) {
+                finalUrl = await this.uploadToS3(file.path, finalFilename, file.mimetype);
+                try { fs.unlinkSync(file.path); } catch (e) { }
+            }
         }
 
         return (this.prisma as any).media.create({
@@ -286,16 +298,36 @@ export class MediaService {
         if (item) {
             const isCloudinary = item.url.startsWith('http');
 
-            if (!isCloudinary) {
+            if (!isCloudinary && item.url) {
                 const uploadDir = './uploads';
-                const mainPath = path.join(uploadDir, path.basename(item.url));
-                if (fs.existsSync(mainPath)) fs.unlinkSync(mainPath);
+                const filename = path.basename(item.url);
+                if (filename) {
+                    const mainPath = path.join(uploadDir, filename);
+                    if (fs.existsSync(mainPath) && fs.lstatSync(mainPath).isFile()) {
+                        fs.unlinkSync(mainPath);
+                    }
 
-                if (item.metadata && (item.metadata as any).versions) {
-                    const versions = (item.metadata as any).versions;
-                    for (const vUrl of Object.values(versions)) {
-                        const vPath = path.join(uploadDir, path.basename(vUrl as string));
-                        if (fs.existsSync(vPath)) fs.unlinkSync(vPath);
+                    if (item.metadata && (item.metadata as any).versions) {
+                        const versions = (item.metadata as any).versions;
+                        for (const vUrl of Object.values(versions)) {
+                            const vFilename = path.basename(vUrl as string);
+                            if (vFilename) {
+                                const vPath = path.join(uploadDir, vFilename);
+                                if (fs.existsSync(vPath) && fs.lstatSync(vPath).isFile()) {
+                                    fs.unlinkSync(vPath);
+                                }
+                            }
+                        }
+                    }
+
+                    if (item.metadata && (item.metadata as any).poster) {
+                        const pFilename = path.basename((item.metadata as any).poster);
+                        if (pFilename) {
+                            const pPath = path.join(uploadDir, pFilename);
+                            if (fs.existsSync(pPath) && fs.lstatSync(pPath).isFile()) {
+                                fs.unlinkSync(pPath);
+                            }
+                        }
                     }
                 }
             }

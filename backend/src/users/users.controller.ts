@@ -114,19 +114,19 @@ export class UsersController {
     @Delete(':id')
     @RequirePermissions(Permission.USERS_DELETE)
     async remove(@Param('id') id: string, @Request() req) {
-        await this.accessControl.validateHierarchy(req.user.userId, id);
+        await this.accessControl.validateHierarchy(req.user.id, id);
         const res = await this.usersService.remove(id);
-        await this.auditLog.log(req.user.userId, 'USER_DELETE', { targetUserId: id });
+        await this.auditLog.log(req.user.id, 'USER_DELETE', { targetUserId: id });
         return res;
     }
 
     @Patch(':id/deactivate')
     @RequirePermissions(Permission.USERS_DEACTIVATE)
     async deactivate(@Param('id') id: string, @Request() req) {
-        await this.accessControl.validateHierarchy(req.user.userId, id);
+        await this.accessControl.validateHierarchy(req.user.id, id);
         const target = await this.usersService.findById(id);
         const res = await this.usersService.deactivate(id);
-        await this.auditLog.log(req.user.userId, 'USER_DEACTIVATE', {
+        await this.auditLog.log(req.user.id, 'USER_DEACTIVATE', {
             targetUserId: id,
             targetUserName: target?.name || 'Unknown User'
         });
@@ -136,7 +136,7 @@ export class UsersController {
     @Patch(':id/reactivate')
     @RequirePermissions(Permission.USERS_REACTIVATE)
     async reactivate(@Param('id') id: string, @Body() data: { newEmail?: string }, @Request() req) {
-        await this.accessControl.validateHierarchy(req.user.userId, id);
+        await this.accessControl.validateHierarchy(req.user.id, id);
 
         // Only Super Admin can change email during reactivation
         if (data.newEmail) {
@@ -148,7 +148,7 @@ export class UsersController {
 
         const target = await this.usersService.findById(id);
         const res = await this.usersService.reactivate(id, data.newEmail);
-        await this.auditLog.log(req.user.userId, 'USER_REACTIVATE', {
+        await this.auditLog.log(req.user.id, 'USER_REACTIVATE', {
             targetUserId: id,
             targetUserName: target?.name || 'Unknown User',
             emailChanged: !!data.newEmail
@@ -162,7 +162,7 @@ export class UsersController {
         // Transfer logic usually involves moving data from 'id' to 'targetUserId'
         // This is strictly restricted to Super Admin as per request.
         const res = await this.usersService.transferData(id, data.targetUserId);
-        await this.auditLog.log(req.user.userId, 'USER_DATA_TRANSFER', { sourceUserId: id, targetUserId: data.targetUserId });
+        await this.auditLog.log(req.user.id, 'USER_DATA_TRANSFER', { sourceUserId: id, targetUserId: data.targetUserId });
         return res;
     }
 }

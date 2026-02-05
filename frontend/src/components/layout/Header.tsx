@@ -28,7 +28,11 @@ export default function Header({ isCollapsed }: HeaderProps) {
     const segments = pathname.split('/').filter(Boolean);
     const [user, setUser] = useState<any>(null);
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
     const menuRef = useRef<HTMLDivElement>(null);
+    const bellRef = useRef<HTMLDivElement>(null);
 
     // Fetch user data
     useEffect(() => {
@@ -59,16 +63,63 @@ export default function Header({ isCollapsed }: HeaderProps) {
         fetchUser();
     }, []);
 
+    // Fetch notifications
+    const fetchNotifications = async () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const res = await fetch('http://localhost:3001/notifications', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setNotifications(data);
+                }
+
+                const countRes = await fetch('http://localhost:3001/notifications/unread-count', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (countRes.ok) {
+                    const { count } = await countRes.json();
+                    setUnreadCount(count);
+                }
+            } catch (e) {
+                console.debug('Failed to fetch notifications:', e);
+            }
+        }
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 60000); // Polling every minute
+        return () => clearInterval(interval);
+    }, []);
+
     // Close menu when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 setIsUserMenuOpen(false);
             }
+            if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
+                setIsNotificationsOpen(false);
+            }
         }
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const token = localStorage.getItem('token');
+        if (token) {
+            await fetch(`http://localhost:3001/notifications/${id}/read`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            fetchNotifications();
+        }
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -86,20 +137,30 @@ export default function Header({ isCollapsed }: HeaderProps) {
             <div className="flex flex-1 items-center gap-x-6">
                 {/* Dynamic Breadcrumbs */}
                 <nav className="hidden md:flex items-center space-x-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 font-display">
-                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors flex items-center gap-1.5">
+                    <Link href="/dashboard" className="hover:text-blue-600 transition-colors flex items-center gap-1.5 shrink-0">
                         <HomeIcon className="h-3 w-3" strokeWidth={2.5} />
                         {settings['site_title'] || 'CMS'}
                     </Link>
-                    {segments.map((segment, index) => (
-                        <div key={segment} className="flex items-center space-x-2">
-                            <span className="text-slate-400 font-normal">/</span>
-                            <span className={classNames(
-                                index === segments.length - 1 ? "text-slate-900" : "hover:text-blue-600 cursor-pointer transition-colors"
-                            )}>
-                                {segment.replace(/-/g, ' ')}
-                            </span>
-                        </div>
-                    ))}
+                    {segments.filter(s => s !== 'dashboard').map((segment, index, filteredSegments) => {
+                        const href = `/dashboard/${filteredSegments.slice(0, index + 1).join('/')}`;
+                        const isLast = index === filteredSegments.length - 1;
+                        const label = segment === 'seo' ? 'SEO' : segment.replace(/-/g, ' ');
+
+                        return (
+                            <div key={segment} className="flex items-center space-x-2">
+                                <span className="text-slate-400 font-normal">/</span>
+                                {isLast ? (
+                                    <span className="text-slate-900 truncate max-w-[150px]">
+                                        {label}
+                                    </span>
+                                ) : (
+                                    <Link href={href} className="hover:text-blue-600 cursor-pointer transition-colors whitespace-nowrap">
+                                        {label}
+                                    </Link>
+                                )}
+                            </div>
+                        );
+                    })}
                 </nav>
 
                 <div className="h-4 w-px bg-slate-200/50 hidden md:block" />
@@ -117,10 +178,67 @@ export default function Header({ isCollapsed }: HeaderProps) {
                 </div>
 
                 <div className="ml-auto flex items-center gap-x-4">
-                    <button type="button" className="relative p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all active:scale-95 duration-300">
-                        <BellIcon className="h-5 w-5" />
-                        <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-blue-600 ring-2 ring-white"></span>
-                    </button>
+                    <div className="relative" ref={bellRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                            className="relative p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl transition-all active:scale-95 duration-300"
+                        >
+                            <BellIcon className="h-5 w-5" />
+                            {unreadCount > 0 && (
+                                <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-blue-600 ring-2 ring-white animate-pulse"></span>
+                            )}
+                        </button>
+
+                        {isNotificationsOpen && (
+                            <div className="absolute right-0 mt-3 w-80 origin-top-right rounded-3xl bg-white p-2 shadow-2xl shadow-slate-900/10 border border-slate-100 ring-1 ring-black/5 animate-in zoom-in-95 slide-in-from-top-2 duration-300 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-slate-50 mb-1 flex justify-between items-center">
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Notifications</h3>
+                                    {unreadCount > 0 && <span className="text-[9px] font-bold bg-blue-600 text-white px-1.5 py-0.5 rounded-full">{unreadCount} New</span>}
+                                </div>
+                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                    {notifications.length === 0 ? (
+                                        <div className="py-8 text-center">
+                                            <p className="text-[10px] font-bold text-slate-400">All caught up!</p>
+                                        </div>
+                                    ) : (
+                                        notifications.map((n) => (
+                                            <div
+                                                key={n.id}
+                                                onClick={() => n.link && router.push(n.link)}
+                                                className={classNames(
+                                                    "px-4 py-3 rounded-2xl transition-all cursor-pointer hover:bg-slate-50 relative group",
+                                                    !n.isRead ? "bg-blue-50/30" : "opacity-80"
+                                                )}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className={classNames(
+                                                        "h-2 w-2 rounded-full mt-1.5 shrink-0",
+                                                        n.type === 'SUCCESS' ? "bg-emerald-500" :
+                                                            n.type === 'DANGER' ? "bg-red-500" :
+                                                                n.type === 'WARNING' ? "bg-amber-500" : "bg-blue-500"
+                                                    )} />
+                                                    <div className="flex-1">
+                                                        <h4 className="text-[11px] font-black text-slate-900 leading-tight">{n.title}</h4>
+                                                        <p className="text-[10px] font-medium text-slate-500 mt-0.5 leading-relaxed">{n.message}</p>
+                                                        <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase">{new Date(n.createdAt).toLocaleDateString()}</p>
+                                                    </div>
+                                                    {!n.isRead && (
+                                                        <button
+                                                            onClick={(e) => handleMarkAsRead(n.id, e)}
+                                                            className="text-[9px] font-bold text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            Mark read
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="h-7 w-px bg-slate-200/50" />
 

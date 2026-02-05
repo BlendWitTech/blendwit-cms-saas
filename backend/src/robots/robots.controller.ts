@@ -31,7 +31,7 @@ export class RobotsController {
     @RequirePermissions(Permission.SEO_MANAGE)
     async updateRobotsTxt(@Body() data: { content: string }, @Request() req) {
         const result = await this.robotsService.updateRobotsTxt(data.content);
-        await this.auditLog.log(req.user.userId, 'ROBOTS_TXT_UPDATE', {});
+        await this.auditLog.log(req.user.id, 'ROBOTS_TXT_UPDATE', {});
         return result;
     }
 }

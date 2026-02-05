@@ -5,36 +5,182 @@ import { PrismaService } from '../prisma/prisma.service';
 export class SeoMetaService {
     constructor(private prisma: PrismaService) { }
 
-    async findByPage(pageType: string, pageId?: string) {
-        return this.prisma.seoMeta.findUnique({
+    async getDashboardStats() {
+        // 1. Count total posts, pages and projects
+        const totalPosts = await (this.prisma as any).post.count();
+        const totalPages = await (this.prisma as any).page.count();
+        const totalProjects = await (this.prisma as any).project.count();
+        const combinedTotal = totalPosts + totalPages + totalProjects;
+
+        // 2. Count items with SEO metadata (only those that actually exist in their respective tables)
+        const [postsWithSeo, pagesWithSeo, projectsWithSeo] = await Promise.all([
+            (this.prisma as any).seoMeta.count({
+                where: {
+                    pageType: { in: ['post', 'POST'] },
+                    pageId: { not: null },
+                }
+            }),
+            (this.prisma as any).seoMeta.count({
+                where: {
+                    pageType: { in: ['page', 'PAGE'] },
+                    pageId: { not: null }
+                }
+            }),
+            (this.prisma as any).seoMeta.count({
+                where: {
+                    OR: [
+                        { pageType: { in: ['project', 'PROJECT', 'Project'] } },
+                        { projectId: { not: null } }
+                    ]
+                }
+            })
+        ]);
+
+        // To be 100% accurate, we should count occurrences in metaMap
+        // But for dashboard stats, we'll cap it at the total content count to avoid score > 100
+        const itemsWithSeo = Math.min(combinedTotal, postsWithSeo + pagesWithSeo + projectsWithSeo);
+
+        // 3. Count active redirects
+        const activeRedirects = await (this.prisma as any).redirect.count({
+            where: { isActive: true }
+        });
+
+        return {
+            totalPosts: combinedTotal,
+            postsWithSeo: itemsWithSeo,
+            redirects: activeRedirects,
+            sitemapLastGenerated: new Date(),
+        };
+    }
+
+    async getContentList() {
+        const posts = await (this.prisma as any).post.findMany({
+            select: { id: true, title: true, slug: true, status: true },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        const pages = await (this.prisma as any).page.findMany({
+            select: { id: true, title: true, slug: true, status: true },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        const projects = await (this.prisma as any).project.findMany({
+            select: { id: true, title: true, slug: true, status: true },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        const allMeta = await (this.prisma as any).seoMeta.findMany({
             where: {
-                pageType_pageId: {
-                    pageType,
-                    pageId: (pageId || null) as any, // Cast to any to bypass strict typing issues (schema allows null)
-                },
+                OR: [
+                    { pageType: { in: ['post', 'POST'] } },
+                    { pageType: { in: ['page', 'PAGE'] } },
+                    { pageType: { in: ['project', 'PROJECT', 'Project'] } }
+                ]
+            }
+        });
+
+        const metaMap = new Map();
+        allMeta.forEach(m => {
+            // For projects, we might have projectId set. For others, use pageType:pageId.
+            if (m.projectId) {
+                metaMap.set(`project:${m.projectId}`, m);
+            } else if (m.pageId) {
+                metaMap.set(`${m.pageType.toLowerCase()}:${m.pageId}`, m);
+            }
+        });
+
+        return [
+            ...pages.map(p => ({
+                id: p.id,
+                title: p.title,
+                slug: p.slug === 'home' ? '/' : `/${p.slug}`,
+                type: 'page',
+                status: p.status,
+                seo: metaMap.get(`page:${p.id}`) || null,
+                lastModified: new Date(),
+            })),
+            ...posts.map(p => ({
+                id: p.id,
+                title: p.title,
+                slug: `/blog/${p.slug}`,
+                type: 'post',
+                status: p.status,
+                seo: metaMap.get(`post:${p.id}`) || null,
+                lastModified: new Date(),
+            })),
+            ...projects.map(p => ({
+                id: p.id,
+                title: p.title,
+                slug: `/projects/${p.slug}`,
+                type: 'project',
+                status: p.status,
+                seo: metaMap.get(`project:${p.id}`) || null,
+                lastModified: new Date(),
+            }))
+        ];
+    }
+
+    async findByPage(pageType: string, pageId?: string) {
+        const type = pageType.toLowerCase();
+        return (this.prisma as any).seoMeta.findFirst({
+            where: {
+                OR: [
+                    {
+                        pageType: { in: [type, type.toUpperCase()] },
+                        pageId: pageId || null
+                    },
+                    {
+                        projectId: type === 'project' ? pageId : undefined
+                    }
+                ]
             },
         });
     }
 
     async upsert(data: any) {
-        const { pageType, pageId, ...rest } = data;
+        const { pageType, pageId, projectId, ...rest } = data;
+        const type = pageType?.toLowerCase();
 
-        return this.prisma.seoMeta.upsert({
+        const existing = await (this.prisma as any).seoMeta.findFirst({
             where: {
-                pageType_pageId: {
-                    pageType,
-                    pageId: (pageId || null) as any,
-                },
+                OR: [
+                    {
+                        pageType: { in: [type, type?.toUpperCase()] },
+                        pageId: pageId || null
+                    },
+                    {
+                        projectId: projectId || (type === 'project' ? pageId : undefined)
+                    }
+                ]
             },
-            update: rest,
-            create: data,
+        });
+
+        if (existing) {
+            return (this.prisma as any).seoMeta.update({
+                where: { id: existing.id },
+                data: rest,
+            });
+        }
+
+        return (this.prisma as any).seoMeta.create({
+            data,
         });
     }
 
     async delete(id: string) {
-        return this.prisma.seoMeta.delete({
+        return (this.prisma as any).seoMeta.delete({
             where: { id },
         });
+    }
+
+    async deleteByPage(pageType: string, pageId: string) {
+        const type = pageType.toLowerCase();
+        const existing = await this.findByPage(type, pageId);
+        if (existing) {
+            return (this.prisma as any).seoMeta.delete({
+                where: { id: existing.id }
+            });
+        }
     }
 
     async analyzeSeo(content: string, meta: any) {

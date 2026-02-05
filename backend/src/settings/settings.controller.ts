@@ -5,7 +5,6 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { Permission } from '../auth/permissions.enum';
 
-@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('settings')
 export class SettingsController {
     constructor(private readonly settingsService: SettingsService) { }
@@ -16,6 +15,7 @@ export class SettingsController {
     }
 
     @Patch()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
     @RequirePermissions(Permission.SETTINGS_EDIT)
     updateMany(@Body() settings: Record<string, string>) {
         // In a real app, we'd check if the user is a Super Admin here

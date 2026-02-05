@@ -29,7 +29,8 @@ async function getGlobalSeo() {
   try {
     const res = await fetch('http://localhost:3001/seo-meta/GLOBAL', { next: { revalidate: 60 } });
     if (!res.ok) return null;
-    return res.json();
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   } catch (error) {
     return null;
   }
@@ -39,7 +40,8 @@ async function getAnalyticsConfig() {
   try {
     const res = await fetch('http://localhost:3001/analytics/config', { next: { revalidate: 60 } });
     if (!res.ok) return null;
-    return res.json();
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   } catch (error) {
     return null;
   }

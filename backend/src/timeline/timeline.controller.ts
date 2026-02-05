@@ -5,49 +5,48 @@ import { PermissionsGuard } from '../auth/permissions.guard';
 import { RequirePermissions } from '../auth/permissions.decorator';
 import { Permission } from '../auth/permissions.enum';
 
-@UseGuards(PermissionsGuard)
 @Controller('timeline')
 export class TimelineController {
     constructor(private readonly timelineService: TimelineService) { }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_CREATE)
     @Post()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_CREATE)
     create(@Body() createMilestoneDto: any) {
         return this.timelineService.create(createMilestoneDto);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_VIEW)
     @Get()
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_VIEW)
     findAll() {
         return this.timelineService.findAll();
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_VIEW)
     @Get(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_VIEW)
     findOne(@Param('id') id: string) {
         return this.timelineService.findOne(id);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_EDIT)
     @Patch(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_EDIT)
     update(@Param('id') id: string, @Body() updateMilestoneDto: any) {
         return this.timelineService.update(id, updateMilestoneDto);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_DELETE)
     @Delete(':id')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_DELETE)
     remove(@Param('id') id: string) {
         return this.timelineService.remove(id);
     }
 
-    @UseGuards(JwtAuthGuard)
-    @RequirePermissions(Permission.CONTENT_EDIT)
     @Post('reorder')
+    @UseGuards(JwtAuthGuard, PermissionsGuard)
+    @RequirePermissions(Permission.CONTENT_EDIT)
     reorder(@Body() updates: Array<{ id: string; order: number }>) {
         return this.timelineService.reorder(updates);
     }

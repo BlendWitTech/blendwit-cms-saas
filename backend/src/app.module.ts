@@ -32,6 +32,8 @@ import { LeadsModule } from './leads/leads.module';
 import { ProjectCategoriesModule } from './project-categories/project-categories.module';
 import { PagesModule } from './pages/pages.module';
 import { ThemesModule } from './themes/themes.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { ThemesModule } from './themes/themes.module';
     ProjectCategoriesModule,
     PagesModule,
     ThemesModule,
+    NotificationsModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -12,6 +12,7 @@ import {
 import { apiRequest } from '@/lib/api';
 import { useNotification } from '@/context/NotificationContext';
 import { use } from 'react';
+import UnsavedChangesAlert from '@/components/ui/UnsavedChangesAlert';
 
 interface ServiceFormData {
     title: string;
@@ -24,9 +25,10 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     const { id } = use(params);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
     const { showToast } = useNotification();
     const router = useRouter();
-    const { register, handleSubmit, setValue, formState: { errors } } = useForm<ServiceFormData>();
+    const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<ServiceFormData>();
 
     useEffect(() => {
         fetchService();
@@ -37,10 +39,12 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
             setIsLoading(true);
             const data = await apiRequest(`/services/${id}`);
             if (data) {
-                setValue('title', data.title);
-                setValue('description', data.description || '');
-                setValue('icon', data.icon || '');
-                setValue('order', data.order || 0);
+                reset({
+                    title: data.title,
+                    description: data.description || '',
+                    icon: data.icon || '',
+                    order: data.order || 0
+                });
             }
         } catch (error) {
             console.error('Failed to fetch service:', error);
@@ -48,6 +52,14 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
             router.push('/dashboard/services');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleBack = () => {
+        if (isDirty) {
+            setShowUnsavedAlert(true);
+        } else {
+            router.back();
         }
     };
 
@@ -62,10 +74,14 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                 })
             });
             showToast('Service updated successfully', 'success');
+            // Reset form token to clean state so we can redirect without alert thinking it's dirty if we were using a router guard (not used here but good practice)
+            reset(data);
             router.push('/dashboard/services');
+            return true;
         } catch (error) {
             console.error('Failed to update service:', error);
             showToast('Failed to update service', 'error');
+            return false;
         } finally {
             setIsSubmitting(false);
         }
@@ -81,14 +97,27 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
 
     return (
         <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <UnsavedChangesAlert
+                isOpen={showUnsavedAlert}
+                onSaveAndExit={async () => {
+                    await handleSubmit(async (data) => {
+                        const success = await onSubmit(data);
+                        if (success) router.back();
+                    })();
+                }}
+                onDiscardAndExit={() => router.back()}
+                onCancel={() => setShowUnsavedAlert(false)}
+                isSaving={isSubmitting}
+            />
+
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link
-                    href="/dashboard/services"
+                <button
+                    onClick={handleBack}
                     className="p-2 rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm hover:shadow-md"
                 >
                     <ArrowLeftIcon className="h-5 w-5" />
-                </Link>
+                </button>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-display">
                         Edit <span className="text-blue-600">Service</span>
