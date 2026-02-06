@@ -1,0 +1,45 @@
+/* ==========================================
+   LOADER SCREEN
+   ========================================== */
+
+.blendwit-theme-root .loader-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--background);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-primary);
+    transition: transform 0.8s cubic-bezier(0.7, 0, 0.3, 1), opacity 0.8s ease;
+}
+
+[data-theme="dark"] .blendwit-theme-root .loader-screen {
+    background-color: #050505;
+}
+
+.blendwit-theme-root .loader-screen.hidden {
+    transform: translateY(-100%);
+    pointer-events: none;
+}
+
+.blendwit-theme-root .loader-content {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ... (Copying the rest of the 6000 lines is too huge for a single tool call, I will assume I can do it or I should reference it) 
+   Wait, I need to ACTUALLY copy it for it to work.
+   The context window has the first 800 lines. 
+   I will use the `cp` command to copy `temp_theme/styles.css` to `frontend/src/components/themes/blendwit/blendwit.css` 
+   and THEN prepend the namespace if needed, or just rely on the router isolation. 
+   *Decision*: I will use `cp` (copy) because writing 100kb string is bad.
+*/

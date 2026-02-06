@@ -21,6 +21,8 @@ export class AuthService {
         const settings = await (this.prisma as any).setting.findMany();
         const settingsMap = settings.reduce((acc: any, s: any) => ({ ...acc, [s.key]: s.value }), {});
 
+        // Standardize keys: Backend uses 'lockout_threshold', Frontend toggle is 'security_failed_login_limit'
+        const isLockoutEnabled = settingsMap['security_failed_login_limit'] === 'true';
         const threshold = parseInt(settingsMap['lockout_threshold'] || '5');
         const duration = parseInt(settingsMap['lockout_duration'] || '15'); // in minutes
 
@@ -32,7 +34,7 @@ export class AuthService {
         }
 
         // Check for lockout
-        if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+        if (isLockoutEnabled && user.lockoutUntil && user.lockoutUntil > new Date()) {
             throw new UnauthorizedException(`Account is temporarily locked due to multiple failed login attempts. Please try again in ${duration} minutes.`);
         }
 
@@ -52,19 +54,24 @@ export class AuthService {
             return result;
         }
 
-        // Increment failed attempts
-        const attempts = user.failedLoginAttempts + 1;
-        const lockoutUntil = attempts >= threshold ? new Date(Date.now() + duration * 60 * 1000) : null;
+        // Increment failed attempts if lockout is enabled
+        if (isLockoutEnabled) {
+            const attempts = user.failedLoginAttempts + 1;
+            const lockoutUntil = attempts >= threshold ? new Date(Date.now() + duration * 60 * 1000) : null;
 
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-                failedLoginAttempts: attempts,
-                lockoutUntil
-            },
-        });
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    failedLoginAttempts: attempts,
+                    lockoutUntil
+                },
+            });
+            await this.auditLogService.log(user.id, 'LOGIN_FAILURE', { attempts }, 'DANGER');
+        } else {
+            // Just log failure without incrementing lockout counters
+            await this.auditLogService.log(user.id, 'LOGIN_FAILURE', { attempts: 'Lockout Disabled' }, 'WARNING');
+        }
 
-        await this.auditLogService.log(user.id, 'LOGIN_FAILURE', { attempts }, 'DANGER');
         return null;
     }
 

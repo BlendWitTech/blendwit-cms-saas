@@ -1,0 +1,111 @@
+/* Blendwit Premium Theme CSS */
+
+.blendwit-theme {
+    --bg-color: #050505;
+    --accent-color: #ffffff;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 1s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.delay-100 {
+    animation-delay: 0.1s;
+}
+
+/* Curvy Reel */
+.curvy-reel-container {
+    perspective: 1000px;
+    height: 600px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    width: 100%;
+}
+
+.curvy-track {
+    display: flex;
+    gap: 40px;
+    transform: rotateX(10deg) rotateY(-5deg) rotateZ(-2deg);
+    /* The "Twisted Film Strip" effect */
+    transform-style: preserve-3d;
+    animation: scrollReel 20s linear infinite;
+}
+
+@keyframes scrollReel {
+    0% {
+        transform: translateX(0) rotateX(10deg) rotateY(-5deg);
+    }
+
+    100% {
+        transform: translateX(-1000px) rotateX(10deg) rotateY(-5deg);
+    }
+}
+
+.reel-item {
+    width: 300px;
+    transition: transform 0.3s ease;
+}
+
+.reel-item:hover {
+    transform: scale(1.05) translateZ(20px);
+    z-index: 10;
+}
+
+/* 3D Ring View */
+.perspective-3d {
+    perspective: 1500px;
+    overflow: visible;
+}
+
+.ring-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transform: translateZ(-500px);
+    /* Push back to center */
+}
+
+.ring-item {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center;
+    margin-left: -150px;
+    /* Half width */
+    margin-top: -200px;
+    /* Half height */
+    backface-visibility: hidden;
+}
+
+.animate-spin-slow {
+    animation: spinRing 40s linear infinite;
+}
+
+@keyframes spinRing {
+    0% {
+        transform: translateZ(-500px) rotateY(0deg);
+    }
+
+    100% {
+        transform: translateZ(-500px) rotateY(360deg);
+    }
+}
+
+.ring-container:hover {
+    animation-play-state: paused;
+}

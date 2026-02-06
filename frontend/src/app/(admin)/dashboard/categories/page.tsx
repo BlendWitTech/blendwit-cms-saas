@@ -34,6 +34,15 @@ export default function CategoriesPage() {
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, id: '' });
     const [showUnsavedAlert, setShowUnsavedAlert] = useState(false);
 
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        return () => setMounted(false);
+    }, []);
+
+    const { createPortal } = require('react-dom');
+
     const endpoints = {
         blog: '/categories',
         projects: '/project-categories'
@@ -148,9 +157,9 @@ export default function CategoriesPage() {
             />
 
             {/* Modal */}
-            {isModalOpen && (
+            {isModalOpen && mounted && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={handleCloseAttempt} />
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={handleCloseAttempt} />
                     <div className="relative bg-white rounded-2xl w-full max-w-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-300">
                         <h2 className="text-xl font-bold mb-6">
                             {editingCategory ? 'Edit' : 'New'} {activeTab === 'blog' ? 'Blog' : 'Project'} Category
@@ -194,7 +203,8 @@ export default function CategoriesPage() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 px-2">

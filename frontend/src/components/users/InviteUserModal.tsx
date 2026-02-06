@@ -27,48 +27,7 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
     const [roles, setRoles] = useState<any[]>([]);
     const [currentUser, setCurrentUser] = useState<any>(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [rolesData, userData] = await Promise.all([
-                    apiRequest('/roles'),
-                    apiRequest('/users/profile')
-                ]);
-
-                setCurrentUser(userData);
-
-                // Filter roles based on hierarchy
-                // Level 0 (Super Admin) can invite to any role EXCEPT Super Admin (handled by backend too)
-                // Others can only invite to roles with level > their own
-                const filteredRoles = Array.isArray(rolesData) ? rolesData.filter((r: any) => {
-                    if (userData.role.level === 0) {
-                        return r.level !== 0; // Don't allow creating more Super Admins via modal
-                    }
-                    return r.level > userData.role.level;
-                }) : [];
-
-                setRoles(filteredRoles);
-                if (filteredRoles.length > 0) {
-                    setRoleId(filteredRoles[0].id);
-                }
-            } catch (error) {
-                console.error('Failed to fetch invitation data:', error);
-            }
-        };
-
-        if (isOpen) {
-            fetchData();
-        } else {
-            // Reset state on close
-            setEmail('');
-            setIps([]);
-            setCurrentIp('');
-            setSendEmail(true);
-            setShowUnsavedAlert(false);
-        }
-    }, [isOpen]);
-
-    if (!isOpen) return null;
+    const [mounted, setMounted] = React.useState(false);
 
     const isDirty = () => {
         const defaultRoleId = roles.length > 0 ? roles[0].id : '';
@@ -99,24 +58,60 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
         onInvite({ email, role: roleId, ips, sendEmail });
     };
 
-    return (
+    useEffect(() => {
+        setMounted(true);
+        const fetchData = async () => {
+            try {
+                const [rolesData, userData] = await Promise.all([
+                    apiRequest('/roles'),
+                    apiRequest('/users/profile')
+                ]);
+
+                setCurrentUser(userData);
+
+                const filteredRoles = Array.isArray(rolesData) ? rolesData.filter((r: any) => {
+                    if (userData.role.level === 0) {
+                        return r.level !== 0;
+                    }
+                    return r.level > userData.role.level;
+                }) : [];
+
+                setRoles(filteredRoles);
+                if (filteredRoles.length > 0) {
+                    setRoleId(filteredRoles[0].id);
+                }
+            } catch (error) {
+                console.error('Failed to fetch invitation data:', error);
+            }
+        };
+
+        if (isOpen) {
+            fetchData();
+        } else {
+            setEmail('');
+            setIps([]);
+            setCurrentIp('');
+            setSendEmail(true);
+            setShowUnsavedAlert(false);
+        }
+        return () => setMounted(false);
+    }, [isOpen]);
+
+    if (!isOpen || !mounted) return null;
+
+    const { createPortal } = require('react-dom');
+
+    const modalContent = (
         <React.Fragment>
             <UnsavedChangesAlert
                 isOpen={showUnsavedAlert}
                 onSaveAndExit={() => {
-                    // Since invite is an action, Save & Exit conceptually means "Send Invite"
                     onInvite({ email, role: roleId, ips, sendEmail });
-                    // setShowUnsavedAlert(false); // implicit in onClose/onInvite via parent? No usually we close modal
-                    // Wait, onInvite usually closes modal or parent does?
-                    // UsersPage: onInvite calls API then closes/refreshes.
-                    // But strictly speaking, "Save" for Invite is "Send".
-                    // If user intended to close, maybe they didn't mean to send?
-                    // "Save & Exit" -> "Send Invite"? Yes.
                 }}
                 onDiscardAndExit={onClose}
                 onCancel={() => setShowUnsavedAlert(false)}
-                isSaving={false} // Invite is usually fast, or handled by parent.
-                confirmLabel="Send Invite" // Custom label for clarity
+                isSaving={false}
+                confirmLabel="Send Invite"
             />
 
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
@@ -257,4 +252,6 @@ export default function InviteUserModal({ isOpen, onClose, onInvite }: InviteUse
             </div>
         </React.Fragment>
     );
+
+    return createPortal(modalContent, document.body);
 }

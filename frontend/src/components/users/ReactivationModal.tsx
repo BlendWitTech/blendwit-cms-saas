@@ -21,16 +21,7 @@ export default function ReactivationModal({ isOpen, onClose, onReactivate, user,
     const [changeEmail, setChangeEmail] = useState(false);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (!isOpen) {
-            setNewEmail('');
-            setConfirmEmail('');
-            setChangeEmail(false);
-            setError('');
-        }
-    }, [isOpen]);
-
-    if (!isOpen || !user) return null;
+    const [mounted, setMounted] = React.useState(false);
 
     const isSuperAdmin = currentUser?.role?.name === 'Super Admin';
 
@@ -53,7 +44,22 @@ export default function ReactivationModal({ isOpen, onClose, onReactivate, user,
         }
     };
 
-    return (
+    useEffect(() => {
+        setMounted(true);
+        if (!isOpen) {
+            setNewEmail('');
+            setConfirmEmail('');
+            setChangeEmail(false);
+            setError('');
+        }
+        return () => setMounted(false);
+    }, [isOpen]);
+
+    if (!isOpen || !mounted || !user) return null;
+
+    const { createPortal } = require('react-dom');
+
+    const modalContent = (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
@@ -156,4 +162,6 @@ export default function ReactivationModal({ isOpen, onClose, onReactivate, user,
             </div>
         </div>
     );
+
+    return createPortal(modalContent, document.body);
 }

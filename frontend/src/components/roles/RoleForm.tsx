@@ -210,6 +210,39 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
         setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
+    const toggleAllPermissions = () => {
+        if (name === 'Super Admin' || initialData?.name === 'Super Admin') return;
+
+        const allKeys = Object.keys(permissions).filter(k => k !== 'all');
+        const areAllSelected = allKeys.every(k => permissions[k as keyof typeof permissions]);
+
+        const newPermissions = allKeys.reduce((acc, key) => ({
+            ...acc,
+            [key]: !areAllSelected
+        }), {} as typeof permissions);
+
+        setPermissions(prev => ({ ...prev, ...newPermissions }));
+    };
+
+    // ... (inside the render, near the header of permissions)
+
+
+    const toggleSectionPermissions = (sectionKeys: string[]) => {
+        if (name === 'Super Admin' || initialData?.name === 'Super Admin') return;
+
+        const areAllSectionSelected = sectionKeys.every(k => permissions[k as keyof typeof permissions]);
+
+        const newSectionPerms = sectionKeys.reduce((acc, key) => ({
+            ...acc,
+            [key]: !areAllSectionSelected
+        }), {});
+
+        setPermissions(prev => ({ ...prev, ...newSectionPerms }));
+    };
+
+    // ... (inside the render, near the header of permissions)
+
+
     const permissionSections = [
         {
             title: 'User Management',
@@ -408,63 +441,84 @@ export default function RoleForm({ initialData, onSave, isLoading: externalLoadi
 
                 {/* Right Column: Permissions */}
                 <div className="lg:col-span-2 space-y-8">
-                    {permissionSections.map((section, sIdx) => (
-                        <div key={sIdx} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200/50">
-                            <div className="mb-8">
-                                <h3 className="text-lg font-bold text-slate-900 font-display">{section.title}</h3>
-                                <p className="text-sm text-slate-500">{section.desc}</p>
-                            </div>
+                    {permissionSections.map((section, sIdx) => {
+                        const sectionKeys = section.permissions.map(p => p.key);
+                        const isAllSelected = sectionKeys.every(k => permissions[k as keyof typeof permissions]);
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {section.permissions.map((perm) => {
-                                    const isSuperAdmin = name === 'Super Admin' || initialData?.name === 'Super Admin';
-                                    const isEnabled = permissions[perm.key as keyof typeof permissions];
-
-                                    return (
-                                        <div
-                                            key={perm.key}
-                                            onClick={() => !isSuperAdmin && togglePermission(perm.key as any)}
-                                            className={`relative group flex items-start gap-4 p-4 rounded-2xl border transition-all duration-300 ${isSuperAdmin
-                                                ? 'bg-blue-50/50 border-blue-200 shadow-sm cursor-not-allowed'
-                                                : isEnabled
-                                                    ? 'bg-blue-50/50 border-blue-200 shadow-sm cursor-pointer'
-                                                    : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
-                                                }`}
-                                        >
-                                            {isSuperAdmin && (
-                                                <div className="absolute top-2 right-2">
-                                                    <LockClosedIcon className="h-4 w-4 text-blue-600" />
-                                                </div>
-                                            )}
-
-                                            <div className={`mt-1 p-2 rounded-xl transition-colors ${isEnabled
-                                                ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                                                : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-slate-600 group-hover:shadow-md'
-                                                }`}>
-                                                <perm.icon className="h-5 w-5" />
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <h4 className={`text-sm font-bold ${isEnabled ? 'text-blue-900' : 'text-slate-900'}`}>
-                                                        {perm.label}
-                                                    </h4>
-                                                    <div className={`relative flex-shrink-0 h-5 w-9 border-2 border-transparent rounded-full transition-colors ease-in-out duration-200 focus:outline-none ${isEnabled ? 'bg-blue-600' : 'bg-slate-200'
-                                                        } ${isSuperAdmin ? 'opacity-70' : 'cursor-pointer'}`}>
-                                                        <span className={`pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${isEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-                                                            }`} />
-                                                    </div>
-                                                </div>
-                                                <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
-                                                    {perm.desc}
-                                                </p>
-                                            </div>
+                        return (
+                            <div key={sIdx} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-200/50">
+                                <div className="mb-8">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-lg font-bold text-slate-900 font-display">{section.title}</h3>
+                                            <p className="text-sm text-slate-500">{section.desc}</p>
                                         </div>
-                                    );
-                                })}
+                                        {!(name === 'Super Admin' || initialData?.name === 'Super Admin') && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleSectionPermissions(sectionKeys)}
+                                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors uppercase tracking-wider ${isAllSelected
+                                                    ? 'text-slate-500 bg-slate-100 hover:bg-slate-200'
+                                                    : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                                                    }`}
+                                            >
+                                                {isAllSelected ? 'Deselect All' : 'Select All'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {section.permissions.map((perm) => {
+                                        const isSuperAdmin = name === 'Super Admin' || initialData?.name === 'Super Admin';
+                                        const isEnabled = permissions[perm.key as keyof typeof permissions];
+
+                                        return (
+                                            <div
+                                                key={perm.key}
+                                                onClick={() => !isSuperAdmin && togglePermission(perm.key as any)}
+                                                className={`relative group flex items-start gap-4 p-4 rounded-2xl border transition-all duration-300 ${isSuperAdmin
+                                                    ? 'bg-blue-50/50 border-blue-200 shadow-sm cursor-not-allowed'
+                                                    : isEnabled
+                                                        ? 'bg-blue-50/50 border-blue-200 shadow-sm cursor-pointer'
+                                                        : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
+                                                    }`}
+                                            >
+                                                {isSuperAdmin && (
+                                                    <div className="absolute top-2 right-2">
+                                                        <LockClosedIcon className="h-4 w-4 text-blue-600" />
+                                                    </div>
+                                                )}
+
+                                                <div className={`mt-1 p-2 rounded-xl transition-colors ${isEnabled
+                                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                                                    : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-slate-600 group-hover:shadow-md'
+                                                    }`}>
+                                                    <perm.icon className="h-5 w-5" />
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <h4 className={`text-sm font-bold ${isEnabled ? 'text-blue-900' : 'text-slate-900'}`}>
+                                                            {perm.label}
+                                                        </h4>
+                                                        <div className={`relative flex-shrink-0 h-5 w-9 border-2 border-transparent rounded-full transition-colors ease-in-out duration-200 focus:outline-none ${isEnabled ? 'bg-blue-600' : 'bg-slate-200'
+                                                            } ${isSuperAdmin ? 'opacity-70' : 'cursor-pointer'}`}>
+                                                            <span className={`pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${isEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'
+                                                                }`} />
+                                                        </div>
+                                                    </div>
+                                                    <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">
+                                                        {perm.desc}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </form>

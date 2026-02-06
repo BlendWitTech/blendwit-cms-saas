@@ -60,11 +60,21 @@ export default function ConfirmationModal({
     };
 
     const colors = getColors();
+    const [mounted, setMounted] = React.useState(false);
 
-    if (!isOpen) return null;
+    React.useEffect(() => {
+        setMounted(true);
+        return () => setMounted(false);
+    }, []);
 
-    return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6">
+    if (!isOpen || !mounted) return null;
+
+    // Use createPortal to render outside the main layout div (so it covers sidebar)
+    // We cast to any because createPortal types can be tricky with specific React versions if not fully typed
+    const { createPortal } = require('react-dom');
+
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
             <div
                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
                 onClick={onClose}
@@ -117,6 +127,7 @@ export default function ConfirmationModal({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

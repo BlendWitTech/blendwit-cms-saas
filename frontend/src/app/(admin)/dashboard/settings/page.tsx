@@ -661,22 +661,58 @@ export default function SettingsPage() {
                 {activeTab === 'performance' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="bg-white rounded-[3rem] p-10 shadow-2xl shadow-slate-200/40 border border-slate-200/60 space-y-8">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-blue-600 rounded-2xl shadow-xl shadow-blue-500/20 text-white">
-                                    <RocketLaunchIcon className="h-6 w-6" />
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-blue-600 rounded-2xl shadow-xl shadow-blue-500/20 text-white">
+                                        <RocketLaunchIcon className="h-6 w-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 font-display">Optimization</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 font-display">Optimization</h3>
+                                {!isSectionEditing('performance', ['performance_edge_caching']) && (
+                                    <button
+                                        onClick={() => toggleEdit('performance')}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        Edit Config
+                                    </button>
+                                )}
                             </div>
-                            <div className="p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex items-center justify-between group hover:bg-white hover:border-blue-200 transition-all">
+
+                            <label className={`p-8 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex items-center justify-between group transition-all cursor-pointer ${isSectionEditing('performance', ['performance_edge_caching']) ? 'hover:bg-white hover:border-blue-200' : 'opacity-80'}`}>
                                 <div>
                                     <p className="text-sm font-bold text-slate-900">Global Edge Caching</p>
                                     <p className="text-[11px] font-bold text-slate-400 mt-1">Accelerate content delivery via global CDN nodes.</p>
                                 </div>
-                                <div className="h-8 w-14 bg-blue-600 rounded-full relative cursor-pointer">
-                                    <div className="absolute top-1 right-1 h-6 w-6 bg-white rounded-full shadow-lg" />
+                                <div className="relative">
+                                    <input
+                                        type="checkbox"
+                                        className="peer sr-only"
+                                        disabled={!isSectionEditing('performance', ['performance_edge_caching'])}
+                                        checked={settings.performance_edge_caching === 'true'}
+                                        onChange={(e) => setSettings({ ...settings, performance_edge_caching: String(e.target.checked) })}
+                                    />
+                                    <div className="h-8 w-14 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-7 after:w-7 after:transition-all peer-checked:bg-blue-600"></div>
                                 </div>
-                            </div>
+                            </label>
+
+                            {isSectionEditing('performance', ['performance_edge_caching']) && editModes['performance'] && (
+                                <div className="flex gap-4 pt-4">
+                                    <button
+                                        onClick={() => handleSave('performance')}
+                                        className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all"
+                                    >
+                                        Save Changes
+                                    </button>
+                                    <button
+                                        onClick={() => handleCancel('performance')}
+                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
                         </div>
+
                         <div className="bg-white rounded-[3rem] p-10 shadow-2xl shadow-slate-200/40 border border-slate-200/60 p-10 flex flex-col items-center justify-center text-center space-y-4">
                             <div className="h-24 w-24 bg-blue-50 rounded-full flex items-center justify-center">
                                 <AdjustmentsHorizontalIcon className="h-10 w-10 text-blue-600 animate-spin" style={{ animationDuration: '4s' }} />
@@ -691,35 +727,72 @@ export default function SettingsPage() {
                 {activeTab === 'security' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                         <div className="bg-white rounded-[3rem] p-10 shadow-2xl shadow-slate-200/40 border border-slate-200/60 space-y-8">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
-                                    <ShieldCheckIcon className="h-6 w-6" />
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-emerald-500 rounded-2xl shadow-xl shadow-emerald-500/20 text-white">
+                                        <ShieldCheckIcon className="h-6 w-6" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 font-display">Access Protocols</h3>
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 font-display">Access Protocols</h3>
+                                {!isSectionEditing('security', ['security_session_locking', 'security_failed_login_limit', 'security_token_rotation']) && (
+                                    <button
+                                        onClick={() => toggleEdit('security')}
+                                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        Edit Protocols
+                                    </button>
+                                )}
                             </div>
 
                             <div className="space-y-4">
                                 {[
-                                    { title: 'Session Locking', desc: 'Secure sessions automatically after 24h idle.', status: true },
-                                    { title: 'Failed Login Limit', desc: 'Auto-lock accounts after 5 failed attempts.', status: true },
-                                    { title: 'Secure Token Rotation', desc: 'Rotate JWT signing keys every 30 days.', status: false }
+                                    { key: 'security_session_locking', title: 'Session Locking', desc: 'Secure sessions automatically after 24h idle.' },
+                                    { key: 'security_failed_login_limit', title: 'Failed Login Limit', desc: 'Auto-lock accounts after 5 failed attempts.' },
+                                    { key: 'security_token_rotation', title: 'Secure Token Rotation', desc: 'Rotate JWT signing keys every 30 days.' }
                                 ].map(item => (
-                                    <div key={item.title} className="flex items-center justify-between p-6 bg-slate-50/30 rounded-[2rem] border border-slate-100">
+                                    <label key={item.key} className={`flex items-center justify-between p-6 bg-slate-50/30 rounded-[2rem] border border-slate-100 transition-all cursor-pointer ${isSectionEditing('security', ['security_session_locking', 'security_failed_login_limit', 'security_token_rotation']) ? 'hover:bg-white' : 'opacity-90'}`}>
                                         <div className="flex gap-4">
-                                            <div className={classNames("mt-1 ring-2 ring-inset p-1.5 rounded-lg h-fit", item.status ? "ring-emerald-500/10 bg-emerald-50 text-emerald-600" : "ring-slate-200 bg-slate-50 text-slate-300")}>
-                                                {item.status ? <CheckBadgeIcon className="h-4 w-4" /> : <XCircleIcon className="h-4 w-4" />}
+                                            <div className={classNames("mt-1 ring-2 ring-inset p-1.5 rounded-lg h-fit transition-colors", settings[item.key] === 'true' ? "ring-emerald-500/10 bg-emerald-50 text-emerald-600" : "ring-slate-200 bg-slate-50 text-slate-300")}>
+                                                {settings[item.key] === 'true' ? <CheckBadgeIcon className="h-4 w-4" /> : <XCircleIcon className="h-4 w-4" />}
                                             </div>
                                             <div>
                                                 <p className="text-sm font-bold text-slate-800">{item.title}</p>
                                                 <p className="text-xs font-semibold text-slate-400 mt-0.5">{item.desc}</p>
                                             </div>
                                         </div>
-                                        <span className={classNames("text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg", item.status ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400")}>
-                                            {item.status ? "Active" : "Disabled"}
-                                        </span>
-                                    </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className={classNames("text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg transition-colors", settings[item.key] === 'true' ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400")}>
+                                                {settings[item.key] === 'true' ? "Active" : "Disabled"}
+                                            </span>
+                                            {isSectionEditing('security', ['security_session_locking', 'security_failed_login_limit', 'security_token_rotation']) && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={settings[item.key] === 'true'}
+                                                    onChange={(e) => setSettings({ ...settings, [item.key]: String(e.target.checked) })}
+                                                    className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                            )}
+                                        </div>
+                                    </label>
                                 ))}
                             </div>
+
+                            {isSectionEditing('security', ['security_session_locking', 'security_failed_login_limit', 'security_token_rotation']) && editModes['security'] && (
+                                <div className="flex gap-4 pt-4">
+                                    <button
+                                        onClick={() => handleSave('security')}
+                                        className="bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all"
+                                    >
+                                        Save Changes
+                                    </button>
+                                    <button
+                                        onClick={() => handleCancel('security')}
+                                        className="bg-slate-100 text-slate-500 px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all font-bold"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-amber-50 rounded-[3rem] p-10 border border-amber-200/50 flex flex-col justify-center space-y-6">
